@@ -1,0 +1,18 @@
+flowchart TB
+  K["keepalived on edge1 and edge2<br/>runs check_gateway.sh every 2 s<br/>(GET /ready on :8080)"]:::gw --> H{"edge1's gateway ready?"}
+  H -- yes --> V1["VIP on edge1"]:::ok
+  H -- "no (2 failed checks)" --> V2["VIP moves to edge2<br/>in about 4-6 s"]:::bad
+  V1 --> R["MEDITECH's connection to the VIP<br/>reaches that host's gateway"]:::gw
+  V2 --> R
+  R --> S["Stored in JetStream on all three hosts<br/>(majority: two of three)"]:::store
+  S --> A["ACK AA"]:::ok
+  S --> D["One gateway delivers each message<br/>to lab-api over HTTPS, in order"]:::gw
+  D --> X{"Delivering host dies?"}
+  X -- no --> OK["Delivered"]:::ok
+  X -- yes --> W["The other gateway delivers it<br/>after ack_wait (30 s)"]:::bad
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

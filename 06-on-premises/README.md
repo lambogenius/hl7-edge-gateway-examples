@@ -32,6 +32,23 @@ MEDITECH ──MLLP :7890──────────▶│
 
 Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-on-premises>
 
+## Diagrams
+
+**Architecture.** What runs where, and how the systems connect.
+
+![Architecture](diagrams/architecture.png)
+
+**Data flow.** What happens to a message at each step, including the failure paths.
+
+![Data flow](diagrams/data-flow.png)
+
+**Sequence.** One run of the sample, message by message.
+
+![Sequence](diagrams/sequence.png)
+
+The Mermaid sources are in [diagrams/](diagrams). After editing one, re-export the PNGs with
+`../render-diagrams.sh 06-on-premises`.
+
 ## Files
 
 | File | Goes to | On |

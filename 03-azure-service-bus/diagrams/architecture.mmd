@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph H["Hospital network"]
+    M["MEDITECH"]:::ext
+  end
+  subgraph G["HL7 Edge Gateway"]
+    R1["results-to-service-bus<br/>MLLP :7890<br/>store and forward"]:::gw
+    R2["orders-from-service-bus<br/>store and forward"]:::gw
+    Q1[("queue")]:::store
+    Q2[("queue")]:::store
+  end
+  subgraph SB["Azure Service Bus"]
+    T["topic lab-results"]:::ext
+    S1["subscription analytics"]:::ext
+    S2["subscription archive"]:::ext
+    OQ["queue orders-inbound"]:::ext
+  end
+  CP["Care portal"]:::ext
+  M -- "ORU^R01" --> R1 --> Q1 -- "AMQP, MessageId = MSH-10" --> T
+  T --> S1
+  T --> S2
+  CP -- "orders" --> OQ -- "AMQP, peek-lock" --> R2 --> Q2 -- "MLLP :6661" --> M
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

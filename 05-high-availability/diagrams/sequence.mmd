@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  participant M as MEDITECH
+  participant LB as HAProxy
+  participant G1 as gw1
+  participant G2 as gw2
+  participant JS as JetStream (3 nodes)
+  participant A as Lab API
+  M->>LB: ORU^R01 LAB-1001
+  LB->>G1: forward
+  G1->>JS: publish (replicated)
+  JS-->>G1: stored on a majority
+  G1-->>M: ACK AA
+  G2->>JS: fetch next for lab-results
+  JS-->>G2: LAB-1001 (in flight on gw2)
+  G2->>A: POST LAB-1001
+  A-->>G2: 200
+  G2->>JS: ack
+  Note over G1: gw1 crashes
+  M->>LB: ORU^R01 LAB-1007
+  LB--xG1: connection fails
+  LB->>G2: retried on gw2 (redispatch)
+  G2->>JS: publish
+  G2-->>M: ACK AA
+  G2->>A: POST LAB-1007
+  A-->>G2: 200

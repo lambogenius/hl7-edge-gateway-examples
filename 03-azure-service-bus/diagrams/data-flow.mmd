@@ -1,0 +1,25 @@
+flowchart TB
+  subgraph IN["Orders to MEDITECH"]
+    direction LR
+    O["Order on queue orders-inbound"]:::ext --> P["Receive one (peek-lock)"]:::gw --> S["Store in the gateway"]:::store
+    S --> CM["Complete the Service Bus message"]:::ok
+    S --> MD["Send to MEDITECH"]:::gw --> MA{"MEDITECH ACK"}
+    MA -- AA --> DONE["Filed"]:::ok
+    MA -- AR --> DL["Gateway dead letters"]:::bad
+    MA -- "down" --> W["Orders wait in the gateway"]:::bad --> MD
+  end
+  subgraph OUT["Results to Service Bus"]
+    direction LR
+    A["MEDITECH sends a result"]:::ext --> B["Store in the gateway"]:::store --> C["ACK AA"]:::ok
+    B --> D["Publish to topic lab-results,<br/>MessageId = MSH-10"]:::gw
+    D --> E{"Service Bus"}
+    E -- accepted --> F["Every subscription gets a copy;<br/>a resend within the duplicate<br/>window is dropped"]:::ok
+    E -- "unreachable" --> R["Results wait in the gateway,<br/>retried in order"]:::bad --> D
+  end
+  OUT ~~~ IN
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

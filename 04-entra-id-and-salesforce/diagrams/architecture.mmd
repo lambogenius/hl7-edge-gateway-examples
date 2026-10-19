@@ -1,0 +1,28 @@
+flowchart LR
+  subgraph AZ["Microsoft Entra ID"]
+    E["Token endpoint<br/>and published keys (JWKS)"]:::ext
+  end
+  CA["Care app<br/>(Azure)"]:::ext
+  subgraph G["HL7 Edge Gateway"]
+    R1["care-app-orders<br/>HTTPS POST /hl7/orders<br/>JWT check, pass-through"]:::gw
+    R2["results-to-salesforce<br/>MLLP :7890<br/>store and forward"]:::gw
+    Q[("queue")]:::store
+  end
+  M["MEDITECH"]:::ext
+  subgraph SF["Salesforce"]
+    LOGIN["login / My Domain<br/>OAuth 2.0 token"]:::ext
+    APEX["Apex REST<br/>/services/apexrest/Hl7Inbound"]:::ext
+  end
+  CA -- "(1) client credentials" --> E
+  CA -- "(2) POST + Bearer token" --> R1
+  R1 -. "signing keys" .-> E
+  R1 -- "MLLP :6661" --> M
+  M -- "ORU^R01" --> R2 --> Q
+  Q -- "(3) JWT bearer sign-in" --> LOGIN
+  Q -- "(4) POST with the access token" --> APEX
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

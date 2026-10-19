@@ -1,0 +1,17 @@
+sequenceDiagram
+  autonumber
+  participant L as Reference lab
+  participant C as Clinic
+  participant G as HL7 Edge Gateway
+  participant M as MEDITECH
+  L->>G: POST /hl7/results (X-API-Key, ORU^R01 REF-3001)
+  G->>G: check the key, store
+  G-->>L: 200 {"ack_code":"AA"}
+  G->>M: REF-3001 (MLLP :6661)
+  M-->>G: ACK AA (filed)
+  L->>G: POST /hl7/results (no key)
+  G-->>L: 401 (not stored)
+  C->>G: POST /Hl7Service (basic auth, SOAP with ADT^A04)
+  G->>M: ADT^A04 (MLLP :6662)
+  M-->>G: ACK AR "patient not found"
+  G-->>C: 200 SOAP response with MEDITECH's AR

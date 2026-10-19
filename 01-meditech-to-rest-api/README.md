@@ -19,6 +19,23 @@ The sample shows both delivery modes:
 
 Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-meditech-to-rest-api>
 
+## Diagrams
+
+**Architecture.** What runs where, and how the systems connect.
+
+![Architecture](diagrams/architecture.png)
+
+**Data flow.** What happens to a message at each step, including the failure paths.
+
+![Data flow](diagrams/data-flow.png)
+
+**Sequence.** One run of the sample, message by message.
+
+![Sequence](diagrams/sequence.png)
+
+The Mermaid sources are in [diagrams/](diagrams). After editing one, re-export the PNGs with
+`../render-diagrams.sh 01-meditech-to-rest-api`.
+
 ## Files
 
 | File | What it is |

@@ -5,7 +5,8 @@ folder has:
 - the full configuration, with comments;
 - a stand-in for every system it talks to;
 - test messages;
-- a script that runs each step and checks the result.
+- a script that runs each step and checks the result;
+- architecture, data flow and sequence diagrams (Mermaid sources, exported as PNG, in `diagrams/`).
 
 Step-by-step guides with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples>
 
@@ -55,3 +56,5 @@ The samples use the same ports (7890, 8080, 8443…), so run one at a time.
 - `${NAME}` in `gateway.toml` is replaced with the environment variable `NAME`.
 - The admin console is at <http://localhost:8080>. Sign in with `HL7EDGE_ADMIN_TOKEN` from `.env`.
 - `docker compose run --rm send --to gateway:7890 /messages/<file>` uses the gateway's own MLLP test client.
+- Diagrams: edit `<sample>/diagrams/*.mmd`, then run `./render-diagrams.sh <sample>` (Docker) to re-export the
+  PNGs. `mermaid-config.json` sets their look.

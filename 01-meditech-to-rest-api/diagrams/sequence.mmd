@@ -1,0 +1,28 @@
+sequenceDiagram
+  autonumber
+  participant M as MEDITECH
+  participant G as HL7 Edge Gateway
+  participant Q as Queue (disk)
+  participant A as Lab API
+  M->>G: ORU^R01 LAB-1001 (MLLP :7890)
+  G->>Q: store
+  G-->>M: ACK AA
+  G->>A: POST /hl7/results (LAB-1001)
+  A-->>G: 200
+  G->>Q: remove LAB-1001
+  Note over A: The lab API goes down
+  M->>G: ORU^R01 LAB-1004
+  G->>Q: store
+  G-->>M: ACK AA (MEDITECH is not held up)
+  loop backoff until the API is back
+    G->>A: POST /hl7/results (LAB-1004)
+    A-->>G: 503
+  end
+  Note over A: The lab API is back
+  G->>A: POST /hl7/results (LAB-1004)
+  A-->>G: 200
+  G->>Q: remove LAB-1004
+  M->>G: ADT^A01 ADT-2001 (MLLP :7891, pass-through)
+  G->>A: POST /hl7/admissions
+  A-->>G: 200
+  G-->>M: ACK AA (the API's answer)
