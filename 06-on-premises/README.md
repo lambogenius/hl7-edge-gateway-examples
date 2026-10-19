@@ -30,7 +30,7 @@ MEDITECH ──MLLP :7890──────────▶│
   - The NATS hosts authenticate each other with mutual TLS.
   - Plain MLLP stays on the VLAN; for MLLPS, see [sample 02](../02-partners-to-meditech).
 
-Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples/on-premises>
+Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-on-premises>
 
 ## Files
 

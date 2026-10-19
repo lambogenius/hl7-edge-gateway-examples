@@ -21,7 +21,7 @@ MEDITECH ◀──MLLP :6661 (orders)───  │                      │ ◀
 The sample runs against the **Service Bus emulator** on your machine, so it needs no Azure subscription.
 [Running against Azure](#running-against-azure) shows the changes for a real namespace.
 
-Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples/azure-service-bus>
+Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-azure-service-bus>
 
 ## Files
 

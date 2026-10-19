@@ -1,0 +1,108 @@
+# HL7 Edge Gateway: two stateless pods (the queue is in NATS JetStream), spread across zones and
+# nodes, behind one MLLP Service. The cloud folders patch the Service (internal load balancer) and
+# the image (your registry).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hl7-edge-gateway
+  labels: { app: hl7-edge-gateway }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: hl7-edge-gateway }
+  template:
+    metadata:
+      labels: { app: hl7-edge-gateway }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: gateway
+          image: lambogenius/hl7-edge-gateway:0.3.0
+          args: ["run", "--config", "/etc/hl7-edge-gateway/hl7-edge-gateway.toml"]
+          ports:
+            - { name: mllp, containerPort: 7890 }
+            - { name: admin, containerPort: 8080 }
+          env:
+            - name: HL7EDGE_NODE_ID
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+          envFrom:
+            - secretRef: { name: hl7edge-secrets }
+          startupProbe:            # NATS may still be starting: allow up to 5 minutes before liveness applies
+            httpGet: { path: /health, port: admin }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:          # ready = config loaded and JetStream reachable
+            httpGet: { path: /ready, port: admin }
+            periodSeconds: 2
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /health, port: admin }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: config, mountPath: /etc/hl7-edge-gateway, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: config
+          configMap: { name: hl7edge-config }
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: hl7-edge-gateway } }
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: hl7-edge-gateway } }
+---
+# MEDITECH connects here. Both pods serve every route (active/active); a pod that is not ready gets
+# no new connections.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hl7edge-mllp
+  labels: { app: hl7-edge-gateway }
+spec:
+  type: LoadBalancer
+  selector: { app: hl7-edge-gateway }
+  ports:
+    - { name: lab-results, port: 7890, targetPort: mllp }
+---
+# Admin console and API, inside the cluster only: kubectl -n hl7edge port-forward svc/hl7edge-admin 8080
+apiVersion: v1
+kind: Service
+metadata:
+  name: hl7edge-admin
+  labels: { app: hl7-edge-gateway }
+spec:
+  type: ClusterIP
+  selector: { app: hl7-edge-gateway }
+  ports:
+    - { name: admin, port: 8080, targetPort: admin }
+---
+# Keep one gateway running during node drains and cluster upgrades.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hl7-edge-gateway
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: hl7-edge-gateway }

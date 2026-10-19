@@ -1,0 +1,30 @@
+# HL7 Edge Gateway on Kubernetes: the same file for every pod (a ConfigMap). The node ID is the pod
+# name; secrets come from the Secret hl7edge-secrets as environment variables.
+
+node_id = "${HL7EDGE_NODE_ID}"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+
+[store]
+backend = "jetstream"
+urls = ["nats://nats.hl7edge.svc.cluster.local:4222"]   # the NATS chart's client Service
+token = "${NATS_TOKEN}"
+replicas = 3
+ack_wait = "30s"
+
+[[route]]
+name = "lab-results"
+mode = "store_and_forward"
+request_timeout = "15s"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[route.destination]
+type = "http"
+url = "${LAB_API_URL}"
+headers = { Authorization = "Bearer ${LAB_API_TOKEN}" }
+
+[route.store_and_forward]
+on_reject = "dead_letter"
+retry = { initial = "2s", max = "60s", multiplier = 2.0 }

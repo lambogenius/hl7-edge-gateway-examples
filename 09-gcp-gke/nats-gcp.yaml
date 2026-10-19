@@ -1,0 +1,6 @@
+# GKE additions to ../shared/kubernetes/nats-values.yaml: SSD persistent disks (pd-ssd) for JetStream.
+config:
+  jetstream:
+    fileStore:
+      pvc:
+        storageClassName: premium-rwo

@@ -18,7 +18,7 @@ Lakeside Clinic ──POST /Hl7Service  (SOAP, basic)  ──▶ │   HTTPS :84
 
 Both routes share port 8443 and are told apart by their path.
 
-Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples/partners-to-meditech>
+Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-partners-to-meditech>
 
 ## Files
 

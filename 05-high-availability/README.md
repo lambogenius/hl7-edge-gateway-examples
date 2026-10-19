@@ -30,7 +30,7 @@ How it works:
 - **Quorum.** With three NATS nodes and three replicas, the queue keeps working with any one NATS node
   down.
 
-Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples/high-availability>
+Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-high-availability>
 
 ## Files
 

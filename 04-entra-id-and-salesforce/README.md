@@ -23,7 +23,7 @@ MEDITECH ──MLLP :7890 (results)──────────▶ │   conso
 | `care-app-orders` | HTTPS `POST /hl7/orders` → MLLP | Entra ID JWT: signature checked against the tenant's published keys; issuer, audience, expiry, and the `Hl7.Send` role | pass-through: the care app gets MEDITECH's ACK |
 | `results-to-salesforce` | MLLP → Salesforce Apex REST | OAuth 2.0 JWT bearer: the gateway signs an assertion with its private key; tokens are cached and renewed | store and forward |
 
-Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples/entra-id-and-salesforce>
+Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-entra-id-and-salesforce>
 
 ## Files
 

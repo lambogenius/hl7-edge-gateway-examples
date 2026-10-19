@@ -17,7 +17,7 @@ The sample shows both delivery modes:
 | `lab-results` | store and forward | `AA` as soon as the result is stored on disk. The gateway delivers in order and keeps retrying while the API is down. A result the API rejects is moved to dead letters, and the rest keep flowing. |
 | `admissions` | pass-through | The API's own answer. Nothing is stored: if the API is down, MEDITECH gets `AE` and resends. |
 
-Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/examples/meditech-to-rest-api>
+Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-meditech-to-rest-api>
 
 ## Files
 

@@ -1,0 +1,12 @@
+# Encrypted gp3 disks for JetStream, created in the zone of the pod that uses them.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-encrypted
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain             # keep the queue's disks if the NATS release is deleted by mistake

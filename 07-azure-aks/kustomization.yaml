@@ -1,0 +1,24 @@
+# Sample 07: the shared base on AKS. setup.sh fills in your registry.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hl7edge
+resources:
+  - ../shared/kubernetes
+images:
+  - name: lambogenius/hl7-edge-gateway
+    newName: REGISTRY.azurecr.io/hl7-edge-gateway   # setup.sh sets your ACR name
+    newTag: "0.3.0"
+patches:
+  # MLLP on an internal Azure Load Balancer (a private IP in the cluster's virtual network), never public.
+  - target: { kind: Service, name: hl7edge-mllp }
+    patch: |
+      - op: add
+        path: /metadata/annotations
+        value:
+          service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+          # Optional: put it in a specific subnet, or pin its address:
+          # service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "snet-hl7"
+          # service.beta.kubernetes.io/azure-load-balancer-ipv4: "10.224.0.50"
+      - op: add
+        path: /spec/externalTrafficPolicy
+        value: Local      # keep the sender's address (for allow_from); the LB probes each node
