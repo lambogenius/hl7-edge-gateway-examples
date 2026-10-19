@@ -7,7 +7,7 @@ function Fail($text) { Write-Host "FAILED: $text" -ForegroundColor Red; exit 1 }
 function Ready { try { (Invoke-WebRequest http://localhost:8080/ready -UseBasicParsing).StatusCode -eq 200 } catch { $false } }
 if (-not (Test-Path .env)) { Fail 'copy .env.example to .env and put your license in it' }
 $envFile = @{}
-Get-Content .env | Where-Object { $_ -match '^\s*([A-Z_]+)=(.*)$' } | ForEach-Object { $envFile[$Matches[1]] = $Matches[2] }
+Get-Content .env | Where-Object { $_ -match '^\s*([A-Z0-9_]+)=(.*)$' } | ForEach-Object { $envFile[$Matches[1]] = $Matches[2] }
 
 $response = Join-Path $PSScriptRoot '.response.ps1demo'
 # --ssl-no-revoke: Windows curl cannot check revocation for a test CA that publishes no revocation list.
