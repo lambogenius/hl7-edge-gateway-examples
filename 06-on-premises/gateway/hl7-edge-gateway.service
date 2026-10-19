@@ -1,0 +1,31 @@
+# HL7 Edge Gateway, on edge1 and edge2.
+#   sudo useradd --system --home /var/lib/hl7-edge-gateway --shell /usr/sbin/nologin hl7edge
+#   sudo install -m 755 hl7-edge-gateway /usr/local/bin/      (from lambogenius.com/downloads, Linux x86_64)
+#   sudo install -d -o hl7edge /var/lib/hl7-edge-gateway && sudo install -d /etc/hl7-edge-gateway
+#   sudo cp hl7-edge-gateway.toml /etc/hl7-edge-gateway/ && sudo cp ../certs/ca.crt /etc/hl7-edge-gateway/nats-ca.crt
+#   sudo install -m 600 env.example /etc/hl7-edge-gateway/env     (then edit it)
+#   sudo cp hl7-edge-gateway.service /etc/systemd/system/ && sudo systemctl enable --now hl7-edge-gateway
+
+[Unit]
+Description=Lambogenius HL7 Edge Gateway
+After=network-online.target nats-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hl7edge
+EnvironmentFile=/etc/hl7-edge-gateway/env
+ExecStart=/usr/local/bin/hl7-edge-gateway run --config /etc/hl7-edge-gateway/hl7-edge-gateway.toml
+Restart=always
+RestartSec=2
+WorkingDirectory=/var/lib/hl7-edge-gateway
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hl7-edge-gateway
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

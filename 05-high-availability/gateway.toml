@@ -1,0 +1,37 @@
+# Sample 05: high availability. Every gateway node uses this same file; only HL7EDGE_NODE_ID differs.
+#
+# The queue lives in a 3-node NATS JetStream cluster, with every message on all three NATS nodes
+# (replicas = 3). Any gateway node can accept a message and any can deliver it, and the queue survives
+# losing a gateway node and one NATS node.
+#
+# Delivery stays strictly in order per route: across the whole cluster, one message per route is in
+# flight at a time, and whichever node is free delivers the next. If a node stops while it holds a
+# message, another node delivers that message after ack_wait, and then carries on with the rest.
+
+node_id = "${HL7EDGE_NODE_ID}"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+[store]
+backend = "jetstream"
+urls = ["nats://nats1:4222", "nats://nats2:4222", "nats://nats3:4222"]
+replicas = 3
+ack_wait = "30s"                     # how long before another node takes over an in-flight message
+
+[[route]]
+name = "lab-results"
+mode = "store_and_forward"
+request_timeout = "10s"              # must be at least 5 s shorter than ack_wait
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[route.destination]
+type = "http"
+url = "http://lab-api:8000/hl7/results"
+headers = { Authorization = "Bearer ${LAB_API_TOKEN}" }
+
+[route.store_and_forward]
+on_reject = "dead_letter"
+retry = { initial = "2s", max = "15s", multiplier = 2.0 }

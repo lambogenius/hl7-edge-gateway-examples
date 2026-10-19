@@ -1,0 +1,31 @@
+# Values for the official NATS Helm chart (https://github.com/nats-io/k8s), release name "nats":
+#   helm upgrade --install nats nats/nats --version 2.15.1 -n hl7edge -f nats-values.yaml [-f <cloud>-nats.yaml]
+# A 3-node JetStream cluster on persistent disks, one pod per zone, with token auth.
+config:
+  cluster:
+    enabled: true
+    replicas: 3
+  jetstream:
+    enabled: true
+    fileStore:
+      pvc:
+        size: 20Gi
+        # storageClassName: set per cloud
+  merge:
+    authorization:
+      token: << $NATS_TOKEN >>
+container:
+  env:
+    NATS_TOKEN:
+      valueFrom:
+        secretKeyRef: { name: hl7edge-secrets, key: NATS_TOKEN }
+podTemplate:
+  topologySpreadConstraints:
+    kubernetes.io/hostname:
+      maxSkew: 1
+      whenUnsatisfiable: DoNotSchedule
+    topology.kubernetes.io/zone:
+      maxSkew: 1
+      whenUnsatisfiable: ScheduleAnyway
+natsBox:
+  enabled: false

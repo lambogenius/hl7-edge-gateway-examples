@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <SubmitHL7 xmlns="urn:lakeside-clinic:hl7">
+      <message>MSH|^~\&amp;|LAKESIDE_EHR|LAKESIDE_CLINIC|MEDITECH|GENERAL_HOSPITAL|20261019110000||ADT^A04^ADT_A01|CLN-4001|T|2.5.1&#13;EVN|A04|20261019110000&#13;PID|1||100131^^^GENERAL_HOSPITAL^MR||LEE^MIN||19840722|F&#13;PV1|1|O|CLINIC^^^LAKESIDE&#13;</message>
+    </SubmitHL7>
+  </soap:Body>
+</soap:Envelope>

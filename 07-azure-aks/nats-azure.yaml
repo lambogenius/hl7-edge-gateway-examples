@@ -1,0 +1,6 @@
+# AKS additions to ../shared/kubernetes/nats-values.yaml: zonal Premium SSD disks for JetStream.
+config:
+  jetstream:
+    fileStore:
+      pvc:
+        storageClassName: managed-csi-premium

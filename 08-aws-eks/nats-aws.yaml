@@ -1,0 +1,6 @@
+# EKS additions to ../shared/kubernetes/nats-values.yaml: encrypted gp3 disks for JetStream.
+config:
+  jetstream:
+    fileStore:
+      pvc:
+        storageClassName: gp3-encrypted

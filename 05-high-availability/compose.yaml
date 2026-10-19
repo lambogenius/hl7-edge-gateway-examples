@@ -1,0 +1,67 @@
+# Sample 05: high availability. 3 NATS JetStream nodes, 2 gateway nodes, HAProxy in front.
+#   docker compose up -d
+#   MLLP (MEDITECH connects here):  localhost:7890  (HAProxy → gw1, or gw2 when gw1 is down)
+#   Consoles:                       http://localhost:8081 (gw1), http://localhost:8082 (gw2)
+name: hl7edge-sample-05
+
+x-nats: &nats
+  image: nats:2.15.1-alpine
+  restart: unless-stopped
+
+x-gateway: &gateway
+  image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+  restart: unless-stopped
+  env_file: .env
+  depends_on: [nats1, nats2, nats3, lab-api]
+  volumes:
+    - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+
+services:
+  nats1:
+    <<: *nats
+    command: ["-n", "nats1", "-js", "-sd", "/data", "-m", "8222", "--cluster_name", "hl7edge", "--cluster", "nats://0.0.0.0:6222", "--routes", "nats://nats2:6222,nats://nats3:6222"]
+    volumes: [nats1:/data]
+  nats2:
+    <<: *nats
+    command: ["-n", "nats2", "-js", "-sd", "/data", "-m", "8222", "--cluster_name", "hl7edge", "--cluster", "nats://0.0.0.0:6222", "--routes", "nats://nats1:6222,nats://nats3:6222"]
+    volumes: [nats2:/data]
+  nats3:
+    <<: *nats
+    command: ["-n", "nats3", "-js", "-sd", "/data", "-m", "8222", "--cluster_name", "hl7edge", "--cluster", "nats://0.0.0.0:6222", "--routes", "nats://nats1:6222,nats://nats2:6222"]
+    volumes: [nats3:/data]
+
+  gw1:
+    <<: *gateway
+    hostname: gw1
+    environment: { HL7EDGE_NODE_ID: gw1 }
+    ports: ["8081:8080"]
+  gw2:
+    <<: *gateway
+    hostname: gw2
+    environment: { HL7EDGE_NODE_ID: gw2 }
+    ports: ["8082:8080"]
+
+  lb:
+    image: haproxy:3.0-alpine
+    restart: unless-stopped
+    depends_on: [gw1, gw2]
+    volumes: ["./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
+    ports: ["7890:7890"]
+
+  lab-api:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes: ["./lab-api:/app:ro"]
+
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+
+volumes:
+  nats1:
+  nats2:
+  nats3:

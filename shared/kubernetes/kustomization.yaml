@@ -1,0 +1,10 @@
+# The cloud-neutral base. Each cloud folder (07-azure-aks, 08-aws-eks, 09-gcp-gke) has a
+# kustomization that uses this one and patches the Service and the image.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hl7edge
+resources:
+  - gateway.yaml
+configMapGenerator:
+  - name: hl7edge-config
+    files: [hl7-edge-gateway.toml]

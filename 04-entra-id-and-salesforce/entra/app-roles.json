@@ -1,0 +1,9 @@
+[
+  {
+    "allowedMemberTypes": ["Application"],
+    "description": "Send HL7 messages to HL7 Edge Gateway",
+    "displayName": "Hl7.Send",
+    "isEnabled": true,
+    "value": "Hl7.Send"
+  }
+]

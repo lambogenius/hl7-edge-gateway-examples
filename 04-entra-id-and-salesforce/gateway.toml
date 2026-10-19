@@ -1,0 +1,64 @@
+# Sample 04: Entra ID callers in, Salesforce out
+#
+#   care-app-orders        A cloud care application posts orders over HTTPS. The gateway accepts only
+#                          Entra ID access tokens issued for the gateway's API and carrying the app role
+#                          Hl7.Send, then passes each order to MEDITECH over MLLP and returns MEDITECH's
+#                          ACK (pass-through).
+#   results-to-salesforce  MEDITECH sends lab results over MLLP; the gateway posts each one to an Apex REST
+#                          service in Salesforce, signed in with the OAuth 2.0 JWT bearer flow (a connected
+#                          app and a certificate, no password). Store-and-forward.
+#
+# Every ${NAME} comes from .env; README.md shows where each value comes from.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "care-app-orders"
+mode = "passthrough"
+
+[route.source]
+type = "http"
+listen = "0.0.0.0:8443"
+path = "/hl7/orders"
+ack_format = "json"
+tls = { cert = "/etc/hl7-edge-gateway/certs/gateway.crt", key = "/etc/hl7-edge-gateway/certs/gateway.key" }
+
+[route.source.auth]
+type = "jwt"
+issuer = "https://login.microsoftonline.com/${ENTRA_TENANT_ID}/v2.0"   # signing keys come from its openid-configuration
+audience = "${GATEWAY_API_APP_ID}"   # v2 tokens carry the API's application (client) ID as audience
+required_roles = ["Hl7.Send"]        # an app role of the API, assigned to each caller
+
+[route.destination]
+type = "mllp"
+address = "meditech:6661"
+
+[[route]]
+name = "results-to-salesforce"
+mode = "store_and_forward"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[route.destination]
+type = "http"
+url = "${SF_LOGIN_URL}/services/apexrest/Hl7Inbound"   # the path is kept; the host becomes the org's instance URL
+content_type = "text/plain"
+
+[route.destination.auth]
+type = "salesforce"
+login_url = "${SF_LOGIN_URL}"         # My Domain URL, or https://login.salesforce.com (https://test.salesforce.com for sandboxes)
+client_id = "${SF_CLIENT_ID}"         # the connected app's consumer key
+username = "${SF_USERNAME}"           # the integration user the gateway acts as
+private_key = "/etc/hl7-edge-gateway/secrets/salesforce.key"   # its certificate is uploaded to the connected app
+
+[route.store_and_forward]
+on_reject = "dead_letter"
+retry = { initial = "2s", max = "60s", multiplier = 2.0 }

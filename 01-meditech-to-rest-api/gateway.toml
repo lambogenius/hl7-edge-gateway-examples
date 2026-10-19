@@ -1,0 +1,44 @@
+# Sample 01: MEDITECH → MLLP → HL7 Edge Gateway → HTTPS REST API
+#
+# Two routes, the two delivery modes:
+#   lab-results  ORU^R01 results, store-and-forward: the sender gets AA as soon as the message is
+#                stored; the gateway then delivers in order and retries while the API is down.
+#                A message the API rejects goes to dead letters and the route carries on.
+#   admissions   ADT^A01/A08 events, pass-through: the sender waits and gets the API's answer.
+#
+# ${NAME} reads an environment variable (set in .env), so secrets stay out of this file.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true            # the console may show message contents (each view is audit-logged)
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"   # a Docker volume, so queued messages survive restarts
+
+[[route]]
+name = "lab-results"
+mode = "store_and_forward"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[route.destination]
+type = "http"
+url = "http://lab-api:8000/hl7/results"
+headers = { Authorization = "Bearer ${LAB_API_TOKEN}" }
+
+[route.store_and_forward]
+on_reject = "dead_letter"            # park a rejected result and keep the others moving
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
+
+[[route]]
+name = "admissions"
+mode = "passthrough"
+source = { type = "mllp", listen = "0.0.0.0:7891" }
+
+[route.destination]
+type = "http"
+url = "http://lab-api:8000/hl7/admissions"
+headers = { Authorization = "Bearer ${LAB_API_TOKEN}" }

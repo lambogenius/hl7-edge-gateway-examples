@@ -1,0 +1,61 @@
+# Sample 02: partners → HTTPS (REST and SOAP) → HL7 Edge Gateway → MLLP → MEDITECH
+#
+# One HTTPS port (8443) serves two routes, told apart by their path:
+#   reference-lab-results  POST /hl7/results     REST, a raw HL7 message as the body.
+#                          Each partner has its own API key; the key's name is logged as the caller.
+#                          Store-and-forward: the partner gets 200 once the result is stored, and the
+#                          gateway delivers it to MEDITECH in order, retrying while MEDITECH is down.
+#   clinic-registrations   POST /Hl7Service      SOAP 1.1, the HL7 message inside the envelope.
+#                          Pass-through: the clinic gets MEDITECH's own ACK (AA, or AR with the reason)
+#                          in the SOAP response. If MEDITECH cannot be reached, the gateway answers AE
+#                          itself, and the clinic resends later.
+#
+# Secrets come from .env through ${NAME}.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "reference-lab-results"
+mode = "store_and_forward"
+
+[route.source]
+type = "http"
+listen = "0.0.0.0:8443"
+path = "/hl7/results"
+ack_format = "json"                  # {"ack_code": "AA", "control_id": "…", "text": "…", "ack": "MSH|…"}
+tls = { cert = "/etc/hl7-edge-gateway/certs/gateway.crt", key = "/etc/hl7-edge-gateway/certs/gateway.key" }
+# allow_from = ["203.0.113.0/24"]    # in production, also limit each partner to its address range
+auth = { type = "api_key", header = "X-API-Key", keys = { northside-reference-lab = "${NORTHSIDE_LAB_API_KEY}", valley-pathology = "${VALLEY_PATHOLOGY_API_KEY}" } }
+
+[route.destination]
+type = "mllp"
+address = "meditech:6661"            # MEDITECH's inbound results interface
+
+[route.store_and_forward]
+on_reject = "dead_letter"            # MEDITECH answered AR: park it, keep the rest flowing
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
+
+[[route]]
+name = "clinic-registrations"
+mode = "passthrough"
+
+[route.source]
+type = "http"
+listen = "0.0.0.0:8443"              # the same port; the TLS settings must match
+path = "/Hl7Service"
+format = "soap"
+tls = { cert = "/etc/hl7-edge-gateway/certs/gateway.crt", key = "/etc/hl7-edge-gateway/certs/gateway.key" }
+auth = { type = "basic", username = "lakeside-clinic", password = "${CLINIC_SOAP_PASSWORD}" }
+
+[route.destination]
+type = "mllp"
+address = "meditech:6662"            # MEDITECH's inbound ADT interface

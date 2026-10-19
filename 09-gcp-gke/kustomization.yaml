@@ -1,0 +1,23 @@
+# Sample 09: the shared base on GKE. setup.sh fills in your registry.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hl7edge
+resources:
+  - ../shared/kubernetes
+images:
+  - name: lambogenius/hl7-edge-gateway
+    newName: REGION-docker.pkg.dev/PROJECT/hl7edge/hl7-edge-gateway   # setup.sh sets your Artifact Registry
+    newTag: "0.3.0"
+patches:
+  # MLLP on an internal passthrough Network Load Balancer (a private IP in the VPC), never external.
+  - target: { kind: Service, name: hl7edge-mllp }
+    patch: |
+      - op: add
+        path: /metadata/annotations
+        value:
+          networking.gke.io/load-balancer-type: "Internal"
+          # Reachable from other regions of the VPC and over Interconnect/VPN attached elsewhere:
+          networking.gke.io/internal-load-balancer-allow-global-access: "true"
+      - op: add
+        path: /spec/externalTrafficPolicy
+        value: Local      # keep the sender's address (for allow_from)

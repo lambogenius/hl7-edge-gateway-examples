@@ -1,0 +1,26 @@
+# Sample 08: the shared base on EKS. setup.sh fills in your registry.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hl7edge
+resources:
+  - ../shared/kubernetes
+images:
+  - name: lambogenius/hl7-edge-gateway
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/hl7-edge-gateway   # setup.sh sets your ECR repository
+    newTag: "0.3.0"
+patches:
+  # MLLP on an internal Network Load Balancer (AWS Load Balancer Controller), never internet-facing.
+  - target: { kind: Service, name: hl7edge-mllp }
+    patch: |
+      - op: add
+        path: /metadata/annotations
+        value:
+          service.beta.kubernetes.io/aws-load-balancer-type: external
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+          service.beta.kubernetes.io/aws-load-balancer-attributes: load_balancing.cross_zone.enabled=true
+          # Health check on the gateway's readiness endpoint, not only on the MLLP port:
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: HTTP
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /ready
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
