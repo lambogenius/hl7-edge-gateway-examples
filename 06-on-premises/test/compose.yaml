@@ -1,0 +1,89 @@
+# Test harness for sample 06: three "hosts" on 10.0.10.0/24, each a container whose network
+# namespace is shared by what runs on that host, using the sample's files unchanged.
+#   edge1 10.0.10.11   NATS, gateway, keepalived (VIP 10.0.10.10 by default)
+#   edge2 10.0.10.12   NATS, gateway, keepalived
+#   edge3 10.0.10.13   NATS
+#   lab-api 10.0.10.20, and the MEDITECH stand-in (`send`) 10.0.10.30
+# ./run.sh runs the failover test.
+name: hl7edge-sample-06-test
+
+x-host: &host
+  image: alpine:3.20
+  command: ["sleep", "infinity"]
+  init: true
+x-nats: &nats
+  image: nats:${NATS_VERSION:-2.15.1}-alpine
+  command: ["--config", "/etc/nats/nats-server.conf"]
+  env_file: .env
+x-gateway: &gateway
+  image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+  env_file: .env
+  command: ["run", "--config", "/etc/hl7-edge-gateway/hl7-edge-gateway.toml"]
+x-keepalived: &keepalived
+  build: { context: .., dockerfile: test/keepalived.Dockerfile }
+  image: hl7edge-sample-06-keepalived
+  cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]
+
+services:
+  edge1: { <<: *host, hostname: edge1, networks: { lan: { ipv4_address: 10.0.10.11 } } }
+  edge2: { <<: *host, hostname: edge2, networks: { lan: { ipv4_address: 10.0.10.12 } } }
+  edge3: { <<: *host, hostname: edge3, networks: { lan: { ipv4_address: 10.0.10.13 } } }
+
+  nats1:
+    <<: *nats
+    network_mode: service:edge1
+    environment: { NATS_SERVER_NAME: edge1 }
+    volumes: ["../nats/nats-server.conf:/etc/nats/nats-server.conf:ro", "../certs/edge1:/etc/nats/certs:ro", "nats1:/var/lib/nats"]
+  nats2:
+    <<: *nats
+    network_mode: service:edge2
+    environment: { NATS_SERVER_NAME: edge2 }
+    volumes: ["../nats/nats-server.conf:/etc/nats/nats-server.conf:ro", "../certs/edge2:/etc/nats/certs:ro", "nats2:/var/lib/nats"]
+  nats3:
+    <<: *nats
+    network_mode: service:edge3
+    environment: { NATS_SERVER_NAME: edge3 }
+    volumes: ["../nats/nats-server.conf:/etc/nats/nats-server.conf:ro", "../certs/edge3:/etc/nats/certs:ro", "nats3:/var/lib/nats"]
+
+  gw1:
+    <<: *gateway
+    network_mode: service:edge1
+    environment: { HL7EDGE_NODE_ID: edge1 }
+    volumes: ["../gateway/hl7-edge-gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro", "../certs/ca.crt:/etc/hl7-edge-gateway/nats-ca.crt:ro"]
+  gw2:
+    <<: *gateway
+    network_mode: service:edge2
+    environment: { HL7EDGE_NODE_ID: edge2 }
+    volumes: ["../gateway/hl7-edge-gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro", "../certs/ca.crt:/etc/hl7-edge-gateway/nats-ca.crt:ro"]
+
+  keepalived1:
+    <<: *keepalived
+    network_mode: service:edge1
+    volumes: ["../keepalived/keepalived-edge1.conf:/config/keepalived.conf:ro"]
+  keepalived2:
+    <<: *keepalived
+    network_mode: service:edge2
+    volumes: ["../keepalived/keepalived-edge2.conf:/config/keepalived.conf:ro"]
+
+  lab-api:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    volumes: ["./lab-api:/app:ro"]
+    networks: { lan: { ipv4_address: 10.0.10.20 } }
+
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    networks: { lan: { ipv4_address: 10.0.10.30 } }
+    profiles: ["tools"]
+
+networks:
+  lan:
+    ipam: { config: [{ subnet: 10.0.10.0/24 }] }
+
+volumes:
+  nats1:
+  nats2:
+  nats3:

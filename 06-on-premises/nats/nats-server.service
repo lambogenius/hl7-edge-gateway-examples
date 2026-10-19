@@ -1,0 +1,33 @@
+# NATS server, on edge1, edge2 and edge3.
+#   sudo useradd --system --home /var/lib/nats --shell /usr/sbin/nologin nats
+#   sudo install -m 755 nats-server /usr/local/bin/          (from https://github.com/nats-io/nats-server/releases)
+#   sudo install -d -o nats -m 700 /var/lib/nats && sudo install -d /etc/nats/certs
+#   sudo cp nats-server.conf /etc/nats/ && sudo cp certs/edgeN/* /etc/nats/certs/ && sudo chown -R nats /etc/nats/certs
+#   /etc/nats/env (chmod 600):  NATS_SERVER_NAME=edgeN   HL7EDGE_NATS_PASSWORD=...
+#   sudo cp nats-server.service /etc/systemd/system/ && sudo systemctl enable --now nats-server
+
+[Unit]
+Description=NATS JetStream for HL7 Edge Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nats
+EnvironmentFile=/etc/nats/env
+ExecStart=/usr/local/bin/nats-server --config /etc/nats/nats-server.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=2
+# Lame duck mode on stop: clients and stream leaders move to the other nodes before it exits.
+KillSignal=SIGUSR2
+TimeoutStopSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nats
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

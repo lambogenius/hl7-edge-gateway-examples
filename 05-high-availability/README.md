@@ -82,6 +82,12 @@ Then run `./demo.sh`, or follow the steps:
 - **DNS in the load balancer.** If it addresses the gateways by name, make sure it re-resolves names: a
   replaced node or container can come back with a different IP address. This sample's `haproxy.cfg` uses
   Docker's DNS server for that (`resolvers docker`).
+- **NATS version.** Use NATS Server 2.15.1 or later (this sample is tested with 2.15.1). In the crash
+  test of [sample 06](../06-on-premises/test) with 2.11.17, the NATS server on the crashed host came back, logged `Detected orphaned
+  stream`, and deleted its copies of the queue streams. It never got them back, so those streams were left
+  with two replicas without any error. Check after any host restart:
+  `curl -s 'localhost:8222/jsz?streams=true'` should list the same streams, with the same `last_seq`, on
+  every host.
 - **Secure NATS.** Use `tls://` URLs with `ca` (and `client_cert`/`client_key` for mutual TLS), and a
   `credentials_file`, `token` or `user`/`password`. The queue holds PHI.
 - **ack_wait.** A shorter `ack_wait` means a faster takeover after a crash. It must stay above the longest
