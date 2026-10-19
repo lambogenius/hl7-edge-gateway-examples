@@ -1,0 +1,54 @@
+# Sample 03: MEDITECH ⇄ HL7 Edge Gateway ⇄ Azure Service Bus (the local emulator)
+#   docker compose up -d                       the emulator takes a minute or two to start
+#   docker compose run --rm send …             send HL7 files to the gateway over MLLP
+#   docker compose run --rm sb …               send to / receive from Service Bus (see README.md)
+name: hl7edge-sample-03
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # lab results from MEDITECH (MLLP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on: [servicebus, meditech]
+
+  # Stand-in for MEDITECH's inbound orders interface.
+  meditech:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/receiver.py"]
+    volumes: ["./meditech:/app:ro"]
+
+  # The Azure Service Bus emulator and the SQL Server it keeps its state in.
+  # By starting them you accept their licenses: https://github.com/Azure/azure-service-bus-emulator-installer
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    volumes: ["./emulator/Config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro"]
+    environment:
+      SQL_SERVER: sqlserver
+      MSSQL_SA_PASSWORD: ${EMULATOR_SQL_PASSWORD}
+      ACCEPT_EULA: "Y"
+    depends_on: [sqlserver]
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      MSSQL_SA_PASSWORD: ${EMULATOR_SQL_PASSWORD}
+      ACCEPT_EULA: "Y"
+
+  # Tools, not started by `up`.
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+  sb:
+    build: ./sb-tool
+    env_file: .env
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+
+volumes:
+  queue:

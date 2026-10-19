@@ -1,0 +1,38 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "sbemulatorns",
+        "Queues": [
+          {
+            "Name": "orders-inbound",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": false,
+              "DefaultMessageTimeToLive": "PT1H",
+              "DuplicateDetectionHistoryTimeWindow": "PT5M",
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 5,
+              "RequiresDuplicateDetection": true,
+              "RequiresSession": false
+            }
+          }
+        ],
+        "Topics": [
+          {
+            "Name": "lab-results",
+            "Properties": {
+              "DefaultMessageTimeToLive": "PT1H",
+              "DuplicateDetectionHistoryTimeWindow": "PT5M",
+              "RequiresDuplicateDetection": true
+            },
+            "Subscriptions": [
+              { "Name": "analytics", "Properties": { "DeadLetteringOnMessageExpiration": false, "DefaultMessageTimeToLive": "PT1H", "LockDuration": "PT1M", "MaxDeliveryCount": 5, "RequiresSession": false } },
+              { "Name": "archive",   "Properties": { "DeadLetteringOnMessageExpiration": false, "DefaultMessageTimeToLive": "PT1H", "LockDuration": "PT1M", "MaxDeliveryCount": 5, "RequiresSession": false } }
+            ]
+          }
+        ]
+      }
+    ],
+    "Logging": { "Type": "Console" }
+  }
+}

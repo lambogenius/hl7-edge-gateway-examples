@@ -1,0 +1,58 @@
+# Sample 03: MEDITECH ⇄ HL7 Edge Gateway ⇄ Azure Service Bus
+#
+#   results-to-service-bus   MEDITECH sends lab results over MLLP; the gateway publishes each one to the
+#                            topic lab-results. Every subscription (analytics, archive) gets its own copy.
+#                            Store-and-forward: MEDITECH gets AA once the result is stored; publishing
+#                            retries while Service Bus is unreachable.
+#   orders-from-service-bus  Cloud applications put orders on the queue orders-inbound; the gateway
+#                            receives them and sends each to MEDITECH over MLLP. Store-and-forward: the
+#                            Service Bus message is completed once the order is stored, and the gateway
+#                            retries into MEDITECH for as long as MEDITECH is down. An order MEDITECH
+#                            rejects (AR) goes to the gateway's dead letters.
+#
+# SERVICE_BUS_CONNECTION_STRING (in .env) points at the local emulator. For a real namespace, see
+# "Running against Azure" in README.md: the same routes with a namespace and Entra ID instead.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "results-to-service-bus"
+mode = "store_and_forward"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[route.destination]
+type = "service_bus"
+connection_string = "${SERVICE_BUS_CONNECTION_STRING}"
+topic = "lab-results"
+# Each message is sent with MessageId = MSH-10 (so duplicate detection drops resends) and the
+# application properties hl7_route, hl7_message_type, hl7_sending_application,
+# hl7_sending_facility and hl7_processing_id, which subscription filters can use.
+
+[route.store_and_forward]
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
+
+[[route]]
+name = "orders-from-service-bus"
+mode = "store_and_forward"
+
+[route.source]
+type = "service_bus"
+connection_string = "${SERVICE_BUS_CONNECTION_STRING}"
+queue = "orders-inbound"
+
+[route.destination]
+type = "mllp"
+address = "meditech:6661"
+
+[route.store_and_forward]
+on_reject = "dead_letter"
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
