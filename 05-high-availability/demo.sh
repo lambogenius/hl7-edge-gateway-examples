@@ -55,7 +55,7 @@ sleep 5
 
 step "4. gw1, the node HAProxy sends MEDITECH to, crashes"
 docker compose kill gw1 >/dev/null 2>&1
-sleep 5   # HAProxy notices within about 4 s
+# Send at once: the connection to the dead gw1 fails, and HAProxy retries it on gw2.
 send /messages/oru-r01-7.hl7
 wait_received 7 20 || fail "LAB-1007 should be delivered through gw2"
 echo "HAProxy moved MEDITECH to gw2; LAB-1007 delivered."
