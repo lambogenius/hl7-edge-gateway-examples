@@ -105,6 +105,25 @@ up.
 to the **HIS's** dead letters (the console: select the `his` row, then Dead letters). The lab and the archive get it
 as usual. Once the patient exists in the HIS, requeue it there.
 
+**5. See why a destination gets an event, or not.** The `filter` command checks the configuration's filters and
+shows, condition by condition, where each message would go. It sends nothing, and doesn't need `.env`:
+
+```sh
+docker compose run --rm -v ./gateway.toml:/gateway.toml:ro --entrypoint hl7-edge-gateway send \
+  filter -c /gateway.toml /messages/adt-a01-inpatient.hl7 /messages/adt-a08-outpatient.hl7
+```
+
+```
+/messages/adt-a08-outpatient.hl7  ADT-9003 ADT^A08  route adt-feed: to his, archive
+  lab              doesn't get it
+    yes  message_type ADT^A01|ADT^A04|ADT^A08   found ADT^A08
+    no   PV1-2 I|E                              found O
+  his              gets it (no filter)
+  archive          gets it (no filter)
+```
+
+The console's **Filter tester** does the same for pasted messages.
+
 Or run all of it: `./demo.sh` (Linux, macOS, Git Bash) or `./demo.ps1` (PowerShell).
 
 **Clean up:** `docker compose down -v`.
@@ -143,12 +162,13 @@ type = "sftp"
   - The other MSH fields by name are `sending_application`, `sending_facility`, `receiving_application`,
     `receiving_facility` and `processing_id`.
   - `fields` takes segment field paths: `PV1-2`, `OBR-4.1`, `PID-3.4.1`. A path matches any occurrence of the
-    segment and any repetition of the field.
+    segment and any repetition of the field; `OBR[2]-4.1` and `PID-3[2].1` look at one.
   - The values of one field are alternatives (OR), and every field named must match (AND). `*` and `?` are
     wildcards.
   - `any = [ {…}, {…} ]` needs at least one of several conditions (OR across fields), and `not = {…}` excludes
     what matches it, for example `filter = { message_type = ["ADT"], not = { message_type = ["ADT^A03"] } }`.
   - A destination without a filter gets every event.
+  - The full syntax: <https://docs.lambogenius.com/hl7-edge-gateway/filters>.
 - **No match.** When no destination's filter matches an event, `on_unmatched` decides: `"accept"` (the default:
   AA, counted in the console) or `"reject"` (AR).
 - **Per-destination settings.** `store_and_forward = { … }` on a destination replaces the route's retry and
