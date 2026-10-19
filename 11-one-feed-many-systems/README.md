@@ -144,7 +144,10 @@ type = "sftp"
     `receiving_facility` and `processing_id`.
   - `fields` takes segment field paths: `PV1-2`, `OBR-4.1`, `PID-3.4.1`. A path matches any occurrence of the
     segment and any repetition of the field.
-  - The values of one field are alternatives, and every field named must match. `*` and `?` are wildcards.
+  - The values of one field are alternatives (OR), and every field named must match (AND). `*` and `?` are
+    wildcards.
+  - `any = [ {…}, {…} ]` needs at least one of several conditions (OR across fields), and `not = {…}` excludes
+    what matches it, for example `filter = { message_type = ["ADT"], not = { message_type = ["ADT^A03"] } }`.
   - A destination without a filter gets every event.
 - **No match.** When no destination's filter matches an event, `on_unmatched` decides: `"accept"` (the default:
   AA, counted in the console) or `"reject"` (AR).
