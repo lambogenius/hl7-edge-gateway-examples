@@ -1,6 +1,6 @@
-flowchart LR
+flowchart TB
   subgraph OUT["Results out: Salesforce"]
-    direction TB
+    direction LR
     S["MEDITECH result"]:::ext --> Q["Store, ACK AA"]:::store --> K{"Cached Salesforce<br/>token still valid?"}
     K -- no --> J["Sign a JWT with the private key,<br/>exchange it for an access token"]:::gw --> P
     K -- yes --> P["POST to Apex REST<br/>at the org's instance URL"]:::gw
@@ -10,7 +10,7 @@ flowchart LR
     SA -- "5xx / down" --> RT["Retry with backoff"]:::bad --> P
   end
   subgraph IN["Orders in: Entra ID callers"]
-    direction TB
+    direction LR
     A["POST /hl7/orders"]:::ext --> T{"Bearer token present<br/>and signed by the tenant?"}
     T -- no --> U["401"]:::bad
     T -- yes --> C{"issuer, audience,<br/>not expired?"}
@@ -19,6 +19,7 @@ flowchart LR
     R -- no --> F["403"]:::bad
     R -- yes --> M["Send to MEDITECH,<br/>return MEDITECH's ACK"]:::ok
   end
+  IN ~~~ OUT
 
   classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
   classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a

@@ -10,6 +10,6 @@ docker run --rm -v "$dir:/data" --entrypoint sh minlag/mermaid-cli:11.4.2 -c '
   cd /data
   for f in ${1:-*}/diagrams/*.mmd; do
     echo "$f"
-    /home/mermaidcli/node_modules/.bin/mmdc -p /puppeteer-config.json -c mermaid-config.json -b white -s 2 \
+    /home/mermaidcli/node_modules/.bin/mmdc -p /puppeteer-config.json -c mermaid-config.json -b white -s 2 -w 1600 \
       -i "$f" -o "${f%.mmd}.png" >/dev/null
   done' sh "${1:-}"
