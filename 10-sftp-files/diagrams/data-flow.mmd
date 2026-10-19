@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph IN["Results: lab files to MEDITECH"]
+    direction LR
+    A["New file in outbox"]:::ext --> B{"Unchanged since<br/>the last listing?"}
+    B -- "no, still uploading" --> W["Wait for the<br/>next listing"]:::gw
+    B -- yes --> C["Read it, split into messages<br/>(single, back to back, HL7 batch)"]:::gw
+    C --> D{"Each message,<br/>in file order"}
+    D -- "HL7" --> S["Store; progress<br/>saved in the store"]:::store --> M["Deliver to MEDITECH"]:::gw
+    M -- AA --> F["Filed"]:::ok
+    M -- AR --> DL["Dead letters"]:::bad
+    M -- "down" --> RT["Retry with backoff"]:::bad
+    D -- "not HL7" --> E["Copy to outbox/errors<br/>with the reason"]:::bad
+    D -- "all done" --> P["Move the file to<br/>outbox/processed"]:::ok
+  end
+  subgraph OUT["Orders: MEDITECH to lab files"]
+    direction LR
+    O["MEDITECH order"]:::ext --> Q["Store, ACK AA"]:::store --> AP["Append to<br/>orders_time.hl7.part"]:::gw
+    AP --> L{"3 orders, or 20 s<br/>since the first?"}
+    L -- no --> AP2["Keep the batch open"]:::gw
+    L -- yes --> CL["Add BTS and FTS,<br/>rename to .hl7"]:::ok
+    AP -- "SFTP server down" --> R2["Order waits in<br/>the gateway, retried"]:::bad
+  end
+  IN ~~~ OUT
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

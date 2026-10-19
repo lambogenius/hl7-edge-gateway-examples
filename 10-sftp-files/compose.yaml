@@ -1,0 +1,62 @@
+# Sample 10: a reference lab's SFTP server ⇄ HL7 Edge Gateway ⇄ MEDITECH
+#   docker compose up -d                      keys, the lab's SFTP server, the gateway and a stand-in MEDITECH
+#   docker compose run --rm send …            send HL7 files to the gateway over MLLP (as MEDITECH)
+#   docker compose run --rm gateway-cli …     other gateway commands, e.g. host-key --to sftp
+name: hl7edge-sample-10
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.4.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # orders from MEDITECH (MLLP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - keys:/keys:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on:
+      sftp: { condition: service_started }
+      meditech: { condition: service_started }
+
+  # The reference lab's SFTP server. The hospital's account "hospital" has the folders outbox (the lab's
+  # results, with processed and errors) and inbox (MEDITECH's orders). It accepts the gateway's key, and
+  # LAB_SFTP_PASSWORD for you, on localhost:2222.
+  sftp:
+    image: atmoz/sftp:alpine
+    command: ["hospital:${LAB_SFTP_PASSWORD}:1001:100:outbox,outbox/processed,outbox/errors,inbox"]
+    ports: ["2222:22"]
+    volumes:
+      - keys:/keys:ro
+      - ./sftp/install-keys.sh:/etc/sftp.d/install-keys.sh:ro
+    depends_on:
+      keys: { condition: service_completed_successfully }
+
+  # Makes the SFTP server's host keys, the gateway's key and its known_hosts, once.
+  keys:
+    image: alpine:3.20
+    command: ["sh", "/scripts/make-keys.sh"]
+    volumes:
+      - keys:/keys
+      - ./sftp:/scripts:ro
+
+  # Stand-in for MEDITECH's inbound results interface.
+  meditech:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/receiver.py"]
+    volumes: ["./meditech:/app:ro"]
+
+  # Tools, not started by `up`.
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.4.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+  gateway-cli:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.4.0}
+    entrypoint: ["hl7-edge-gateway"]
+    profiles: ["tools"]
+
+volumes:
+  keys:
+  queue:

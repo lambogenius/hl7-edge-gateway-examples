@@ -1,0 +1,68 @@
+# Sample 10: a reference lab ⇄ HL7 Edge Gateway ⇄ MEDITECH, with HL7 files on the lab's SFTP server
+#
+#   lab-results-from-sftp  The lab drops result files in its SFTP folder outbox: single messages or HL7
+#                          batches. The gateway reads each finished file, oldest first, hands its results
+#                          to MEDITECH over MLLP in order, then moves the file to outbox/processed.
+#                          Lines that are not HL7 go to outbox/errors with the reason. A result MEDITECH
+#                          rejects (AR) goes to the gateway's dead letters.
+#   orders-to-lab-sftp     MEDITECH sends orders over MLLP; the gateway collects them into HL7 batch files
+#                          in the lab's folder inbox: a file is closed after 3 orders, or 20 seconds after
+#                          its first one.
+#
+# The gateway signs in with a private key and checks the server's host key against known_hosts; both
+# are made by the keys container in compose.yaml (see README.md for using your own).
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "lab-results-from-sftp"
+mode = "store_and_forward"
+
+[route.source]
+type = "sftp"
+host = "sftp"
+username = "hospital"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"     # or host_key = "SHA256:…" (hl7-edge-gateway host-key --to sftp)
+directory = "outbox"                  # relative to the user's home folder
+pattern = "*.hl7"
+poll_interval = "5s"                  # a file is read once it is unchanged between two listings
+after = "move:outbox/processed"       # or "delete", or "rename:.done"
+error_directory = "outbox/errors"
+
+[route.destination]
+type = "mllp"
+address = "meditech:6661"
+
+[route.store_and_forward]
+on_reject = "dead_letter"
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
+
+[[route]]
+name = "orders-to-lab-sftp"
+mode = "store_and_forward"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[route.destination]
+type = "sftp"
+host = "sftp"
+username = "hospital"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"
+directory = "inbox"
+batch_format = "hl7_batch"            # FHS, BHS, the orders, BTS (with the count), FTS
+file_name = "orders_{timestamp}.hl7"  # written as .part and renamed when the batch is closed
+line_ending = "crlf"
+batch = { max_messages = 3, max_wait = "20s" }
+
+[route.store_and_forward]
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
