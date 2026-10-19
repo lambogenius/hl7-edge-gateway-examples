@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+# HL7 segments are separated by CR only; never convert them.
+*.hl7 -text

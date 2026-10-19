@@ -1,0 +1,34 @@
+# Sample 01: MEDITECH → MLLP → HL7 Edge Gateway → HTTPS REST API
+#   docker compose up -d                 start the gateway and the stand-in lab API
+#   docker compose run --rm send …       send HL7 files to the gateway (see README.md)
+name: hl7edge-sample-01
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # lab-results (MLLP)
+      - "7891:7891"   # admissions (MLLP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on: [lab-api]
+
+  lab-api:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes: ["./lab-api:/app:ro"]
+
+  # The gateway's own test client: `docker compose run --rm send --to gateway:7890 /messages/…`
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.3.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+
+volumes:
+  queue:
