@@ -20,6 +20,23 @@ Both routes share port 8443 and are told apart by their path.
 
 Step-by-step guide with screenshots: <https://docs.lambogenius.com/hl7-edge-gateway/example-partners-to-meditech>
 
+## Diagrams
+
+**Architecture.** What runs where, and how the systems connect.
+
+![Architecture](diagrams/architecture.png)
+
+**Data flow.** What happens to a message at each step, including the failure paths.
+
+![Data flow](diagrams/data-flow.png)
+
+**Sequence.** One run of the sample, message by message.
+
+![Sequence](diagrams/sequence.png)
+
+The Mermaid sources are in [diagrams/](diagrams). After editing one, re-export the PNGs with
+`../render-diagrams.sh 02-partners-to-meditech`.
+
 ## Files
 
 | File | What it is |

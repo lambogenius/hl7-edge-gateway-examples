@@ -1,0 +1,22 @@
+flowchart TB
+  C["Partner calls HTTPS :8443"]:::ext --> AUTH{"Credentials valid?<br/>API key or basic auth"}
+  AUTH -- no --> E401["401, nothing stored"]:::bad
+  AUTH -- yes --> PATH{"Path"}
+  PATH -- "/hl7/results (REST)" --> ST["Store"]:::store
+  ST --> J["200 JSON: ack_code AA"]:::ok
+  ST --> D["Send to MEDITECH :6661"]:::gw
+  D --> MA{"MEDITECH ACK"}
+  MA -- AA --> F["Filed; next result"]:::ok
+  MA -- "AR (patient not found)" --> DL["Dead letters"]:::bad
+  MA -- "no answer / down" --> RT["Retry with backoff"]:::bad --> D
+  PATH -- "/Hl7Service (SOAP)" --> X["Take the HL7 out of the envelope"]:::gw
+  X --> D2["Send to MEDITECH :6662"]:::gw
+  D2 --> MB{"MEDITECH ACK"}
+  MB -- "AA or AR" --> SR["SOAP response with<br/>MEDITECH's own ACK"]:::ok
+  MB -- "unreachable" --> AE["SOAP response with AE:<br/>the clinic resends"]:::bad
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

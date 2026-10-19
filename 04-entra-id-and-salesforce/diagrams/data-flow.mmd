@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph OUT["Results out: Salesforce"]
+    direction TB
+    S["MEDITECH result"]:::ext --> Q["Store, ACK AA"]:::store --> K{"Cached Salesforce<br/>token still valid?"}
+    K -- no --> J["Sign a JWT with the private key,<br/>exchange it for an access token"]:::gw --> P
+    K -- yes --> P["POST to Apex REST<br/>at the org's instance URL"]:::gw
+    P --> SA{"Salesforce answers"}
+    SA -- "2xx with AA" --> DONE["Delivered"]:::ok
+    SA -- "401" --> J
+    SA -- "5xx / down" --> RT["Retry with backoff"]:::bad --> P
+  end
+  subgraph IN["Orders in: Entra ID callers"]
+    direction TB
+    A["POST /hl7/orders"]:::ext --> T{"Bearer token present<br/>and signed by the tenant?"}
+    T -- no --> U["401"]:::bad
+    T -- yes --> C{"issuer, audience,<br/>not expired?"}
+    C -- no --> U
+    C -- yes --> R{"app role Hl7.Send?"}
+    R -- no --> F["403"]:::bad
+    R -- yes --> M["Send to MEDITECH,<br/>return MEDITECH's ACK"]:::ok
+  end
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

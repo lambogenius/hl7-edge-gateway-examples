@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph P["Outside partners (internet)"]
+    N["Northside Lab"]:::ext
+    V["Valley Pathology"]:::ext
+    L["Lakeside Clinic"]:::ext
+  end
+  subgraph G["HL7 Edge Gateway, HTTPS :8443"]
+    R1["/hl7/results<br/>REST, API key per lab<br/>store and forward"]:::gw
+    R2["/Hl7Service<br/>SOAP 1.1, basic auth<br/>pass-through"]:::gw
+    Q[("queue")]:::store
+  end
+  subgraph H["Hospital network"]
+    M1["MEDITECH<br/>results interface :6661"]:::ext
+    M2["MEDITECH<br/>ADT interface :6662"]:::ext
+  end
+  N -- "POST HL7 + X-API-Key" --> R1
+  V -- "POST HL7 + X-API-Key" --> R1
+  L -- "SOAP envelope + basic auth" --> R2
+  R1 --> Q -- "MLLP, in order" --> M1
+  R2 -- "MLLP, while the clinic waits" --> M2
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

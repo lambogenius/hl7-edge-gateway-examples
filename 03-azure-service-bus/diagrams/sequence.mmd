@@ -1,0 +1,27 @@
+sequenceDiagram
+  autonumber
+  participant M as MEDITECH
+  participant G as HL7 Edge Gateway
+  participant T as topic lab-results
+  participant S as subscriptions
+  participant Q as queue orders-inbound
+  participant P as Care portal
+  M->>G: ORU^R01 RES-4001 (MLLP :7890)
+  G-->>M: ACK AA (stored)
+  G->>T: send, MessageId RES-4001
+  T->>S: copy to analytics and archive
+  P->>Q: order ORD-5001
+  G->>Q: receive (peek-lock)
+  Q-->>G: ORD-5001
+  G->>G: store
+  G->>Q: complete
+  G->>M: ORD-5001 (MLLP :6661)
+  M-->>G: ACK AA
+  Note over M: MEDITECH down
+  P->>Q: order ORD-5002
+  G->>Q: receive, store, complete
+  G->>M: ORD-5002
+  M--xG: no connection
+  Note over G: ORD-5002 waits in the gateway's queue
+  G->>M: ORD-5002 (retry, MEDITECH back)
+  M-->>G: ACK AA

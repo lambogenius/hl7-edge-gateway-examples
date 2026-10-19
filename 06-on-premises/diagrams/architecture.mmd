@@ -1,0 +1,27 @@
+flowchart TB
+  M["MEDITECH"]:::ext -- "MLLP :7890" --> VIP(["VIP 10.0.10.10<br/>keepalived VRRP"]):::gw
+  subgraph E1["edge1 10.0.10.11"]
+    G1["hl7-edge-gateway<br/>keepalived priority 150"]:::gw
+    N1[("nats-server")]:::store
+  end
+  subgraph E2["edge2 10.0.10.12"]
+    G2["hl7-edge-gateway<br/>keepalived priority 100"]:::gw
+    N2[("nats-server")]:::store
+  end
+  subgraph E3["edge3 10.0.10.13"]
+    N3[("nats-server")]:::store
+  end
+  VIP -- "on edge1 while its<br/>gateway is ready" --> G1
+  VIP -. "else on edge2" .-> G2
+  G1 -- "TLS + password" --> N1
+  G2 -- "TLS + password" --> N2
+  N1 <-- "JetStream cluster, mutual TLS" --> N2
+  N2 <-- "mutual TLS" --> N3
+  G1 -- "HTTPS" --> API["lab-api.hospital.local"]:::ext
+  G2 -- "HTTPS" --> API
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

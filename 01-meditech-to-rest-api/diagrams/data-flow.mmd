@@ -1,0 +1,23 @@
+flowchart TB
+  S["MEDITECH sends a message"]:::ext --> V{"Valid HL7 and<br/>allowed by the license?"}
+  V -- no --> AR0["ACK AR"]:::bad
+  V -- yes --> MODE{"Which route?"}
+  MODE -- "lab-results<br/>store and forward" --> ST["Store on disk"]:::store
+  ST --> AA1["ACK AA to MEDITECH"]:::ok
+  ST --> D1["Deliver the oldest queued result:<br/>POST /hl7/results"]:::gw
+  D1 --> A1{"Lab API answers"}
+  A1 -- "2xx" --> OK1["Remove from queue,<br/>deliver the next one"]:::ok
+  A1 -- "503 or no answer" --> RT["Retry with backoff;<br/>later results wait behind it"]:::bad
+  RT --> D1
+  A1 -- "422 (no patient ID)" --> DL["Move to dead letters,<br/>deliver the next one"]:::bad
+  MODE -- "admissions<br/>pass-through" --> P1["POST /hl7/admissions now"]:::gw
+  P1 --> A2{"Lab API answers"}
+  A2 -- "2xx" --> AA2["ACK AA"]:::ok
+  A2 -- "4xx" --> AR2["ACK AR"]:::bad
+  A2 -- "5xx or down" --> AE2["ACK AE:<br/>MEDITECH resends"]:::bad
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

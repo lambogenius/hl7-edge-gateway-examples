@@ -1,0 +1,19 @@
+flowchart TB
+  A["MEDITECH connects to HAProxy :7890"]:::ext --> B{"gw1 ready?"}
+  B -- yes --> C["gw1 receives the message"]:::gw
+  B -- "no (crashed)" --> C2["gw2 receives the message"]:::gw
+  C --> P["Publish to the route's JetStream stream"]:::store
+  C2 --> P
+  P --> Qm{"Stored on a majority<br/>of NATS nodes?"}
+  Qm -- yes --> AA["ACK AA"]:::ok
+  Qm -- no --> AE["ACK AE: MEDITECH resends"]:::bad
+  P --> H["One message per route in flight,<br/>held by whichever node is free"]:::gw
+  H --> D["Deliver to the lab API"]:::gw
+  D -- "2xx" --> NX["Ack in JetStream; next message"]:::ok
+  H -- "holder crashes" --> W["After ack_wait (30 s) another node<br/>delivers the same message"]:::bad --> D
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

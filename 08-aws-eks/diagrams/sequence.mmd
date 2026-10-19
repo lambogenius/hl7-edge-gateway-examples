@@ -1,0 +1,25 @@
+sequenceDiagram
+  autonumber
+  participant M as MEDITECH
+  participant LB as Internal Network Load Balancer
+  participant P1 as gateway pod 1
+  participant P2 as gateway pod 2
+  participant JS as NATS JetStream
+  participant A as Lab API
+  M->>LB: ORU^R01 (MLLP :7890, over Direct Connect or VPN)
+  LB->>P1: forward
+  P1->>JS: publish (3 replicas)
+  JS-->>P1: stored
+  P1-->>M: ACK AA
+  P2->>JS: fetch next message
+  JS-->>P2: the message
+  P2->>A: POST (HTTPS)
+  A-->>P2: 200
+  P2->>JS: ack
+  Note over P1: pod 1 deleted (node drained or zone lost)
+  LB->>LB: health check fails, pod 1 removed
+  M->>LB: next message
+  LB->>P2: forward
+  P2->>JS: publish
+  P2-->>M: ACK AA
+  Note over P1: Kubernetes starts a replacement pod

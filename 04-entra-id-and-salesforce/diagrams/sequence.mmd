@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant CA as Care app
+  participant E as Entra ID
+  participant G as HL7 Edge Gateway
+  participant M as MEDITECH
+  participant SL as Salesforce login
+  participant SA as Salesforce Apex REST
+  CA->>E: client credentials (scope: gateway API /.default)
+  E-->>CA: access token (aud = gateway API, roles = Hl7.Send)
+  CA->>G: POST /hl7/orders (Bearer token, ORM^O01)
+  G->>E: fetch signing keys (cached)
+  G->>G: check signature, issuer, audience, expiry, role
+  G->>M: ORM^O01 (MLLP :6661)
+  M-->>G: ACK AA
+  G-->>CA: 200 with MEDITECH's ACK
+  M->>G: ORU^R01 (MLLP :7890)
+  G-->>M: ACK AA (stored)
+  G->>SL: JWT bearer assertion (signed with the private key)
+  SL-->>G: access token and instance URL
+  G->>SA: POST /services/apexrest/Hl7Inbound
+  SA-->>G: 200, HL7 ACK AA

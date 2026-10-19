@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  participant M as MEDITECH
+  participant VIP as VIP 10.0.10.10
+  participant E1 as edge1 gateway
+  participant E2 as edge2 gateway
+  participant N as NATS (edge1-3)
+  participant A as lab-api
+  M->>VIP: ORU^R01 (MLLP :7890)
+  VIP->>E1: (VIP is on edge1)
+  E1->>N: publish (3 replicas)
+  N-->>E1: stored
+  E1-->>M: ACK AA
+  E1->>A: POST (HTTPS)
+  A-->>E1: 200
+  Note over E1: edge1 powers off
+  Note over VIP: keepalived on edge2: edge1 silent, VIP moves (about 4-6 s)
+  M->>VIP: reconnect, resend what had no ACK
+  VIP->>E2: (VIP is on edge2)
+  E2->>N: publish (edge2 and edge3 are a majority)
+  E2-->>M: ACK AA
+  E2->>A: POST (HTTPS)
+  A-->>E2: 200
