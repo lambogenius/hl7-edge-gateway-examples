@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant L as Lab SFTP server
+  participant G as HL7 Edge Gateway
+  participant M as MEDITECH
+  Note over L: Lab uploads results-batch.hl7
+  G->>L: list outbox (SFTP, key, host key checked)
+  G->>L: list outbox again: file unchanged
+  G->>L: read results-batch.hl7
+  G->>G: split: LAB-7001, LAB-7002, LAB-7003, store each
+  G->>M: LAB-7001 (MLLP)
+  M-->>G: ACK AA
+  G->>M: LAB-7002, then LAB-7003
+  M-->>G: ACK AA, ACK AA
+  G->>L: move to outbox/processed
+  M->>G: ORM^O01 ORD-8001 (MLLP :7890)
+  G-->>M: ACK AA (stored)
+  G->>L: write orders_time.hl7.part (FHS, BHS, ORD-8001)
+  M->>G: ORD-8002, ORD-8003
+  G-->>M: ACK AA, ACK AA
+  G->>L: append ORD-8002, ORD-8003
+  G->>L: append BTS 3 and FTS, rename to orders_time.hl7
