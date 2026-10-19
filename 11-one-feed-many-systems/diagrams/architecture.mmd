@@ -1,0 +1,21 @@
+flowchart LR
+  M["MEDITECH"]:::ext -- "ADT, MLLP :7890" --> R
+  P["Lakeside Clinic<br/>registration"]:::ext -- "ADT, HTTP :8443<br/>API key" --> R
+  subgraph G["HL7 Edge Gateway: route adt-feed"]
+    R["intake: license check,<br/>filters pick destinations"]:::gw
+    Q1[("queue: lab")]:::store
+    Q2[("queue: his")]:::store
+    Q3[("queue: archive")]:::store
+  end
+  R -- "A01/A04/A08 with<br/>PV1-2 I or E" --> Q1
+  R -- "every event" --> Q2
+  R -- "every event" --> Q3
+  Q1 -- "HTTP, bearer token" --> LAB["Lab REST API"]:::ext
+  Q2 -- "MLLP" --> HIS["Downstream HIS"]:::ext
+  Q3 -- "SFTP, HL7 batch files" --> ARC["Archive SFTP server"]:::ext
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

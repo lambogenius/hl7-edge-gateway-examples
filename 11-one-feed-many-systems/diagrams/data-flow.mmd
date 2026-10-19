@@ -1,0 +1,21 @@
+flowchart TB
+  A["ADT event from MEDITECH (MLLP)<br/>or the partner (HTTP)"]:::ext --> L{"Valid and licensed?"}
+  L -- no --> AR["AR to the sender"]:::bad
+  L -- yes --> F["Check each destination's filter"]:::gw
+  F --> N{"Any destination?"}
+  N -- "no" --> U["on_unmatched:<br/>AA and counted, or AR"]:::bad
+  N -- yes --> S["Store once per matching<br/>destination's queue"]:::store --> AA["AA to the sender"]:::ok
+  S --> D1["lab queue"]:::gw & D2["his queue"]:::gw & D3["archive queue"]:::gw
+  D1 --> X1{"Lab API answers"}
+  X1 -- "2xx" --> OK1["Delivered"]:::ok
+  X1 -- "down" --> RT1["Lab retries; the others<br/>are not held up"]:::bad --> D1
+  D2 --> X2{"HIS ACK"}
+  X2 -- AA --> OK2["Delivered"]:::ok
+  X2 -- AR --> DL2["his dead letters only"]:::bad
+  D3 --> X3["Appended to the open batch file;<br/>closed at 5 events or 20 s"]:::ok
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

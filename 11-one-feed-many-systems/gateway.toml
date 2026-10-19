@@ -1,0 +1,61 @@
+# Sample 11: one ADT feed to three systems, from two senders
+#
+#   Sources        MEDITECH sends ADT over MLLP (:7890); a partner clinic's registration system posts
+#                  ADT over HTTP (:8443, with its API key). Both feed the same route, in arrival order.
+#   Destinations   Each has a queue of its own, so one that is down holds up no other.
+#     lab          The lab's REST API wants only inpatient and emergency admissions: ADT^A01, A04 and
+#                  A08 with patient class (PV1-2) I or E.
+#     his          The downstream HIS gets every ADT event over MLLP.
+#     archive      Every event also goes to the archive's SFTP server, in HL7 batch files.
+#
+# Store-and-forward: the senders get AA once the message is stored for every destination it goes to.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "adt-feed"
+mode = "store_and_forward"
+sources = [
+  { type = "mllp", listen = "0.0.0.0:7890" },
+  # In production put HTTPS (tls = { cert = …, key = … }) in front of the partner.
+  { type = "http", listen = "0.0.0.0:8443", path = "/hl7/adt", auth = { type = "api_key", keys = { lakeside-clinic = "${PARTNER_API_KEY}" } } },
+]
+
+[route.store_and_forward]
+retry = { initial = "2s", max = "30s", multiplier = 2.0 }
+
+[[route.destinations]]
+name = "lab"
+type = "http"
+url = "http://lab-api:8000/hl7/admissions"
+headers = { Authorization = "Bearer ${LAB_API_TOKEN}" }
+# Every field named must match; the values of one field are alternatives. PV1-2 is the patient class.
+filter = { message_type = ["ADT^A01", "ADT^A04", "ADT^A08"], fields = { "PV1-2" = ["I", "E"] } }
+
+[[route.destinations]]
+name = "his"
+type = "mllp"
+address = "his:6661"
+# A patient the HIS doesn't know (AR) goes to this destination's dead letters; the others are unaffected.
+store_and_forward = { on_reject = "dead_letter", retry = { initial = "2s", max = "30s", multiplier = 2.0 } }
+
+[[route.destinations]]
+name = "archive"
+type = "sftp"
+host = "sftp"
+username = "hospital"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"
+directory = "inbox"
+batch_format = "hl7_batch"
+file_name = "adt_{timestamp}.hl7"
+batch = { max_messages = 5, max_wait = "20s" }
