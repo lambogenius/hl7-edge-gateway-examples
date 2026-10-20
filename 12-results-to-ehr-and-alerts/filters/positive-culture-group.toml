@@ -1,0 +1,5 @@
+# Both conditions in the same order: an OBR and the segments after it, up to the next ORC.
+[group]
+segment = "OBR"
+until = ["ORC"]
+fields = { "OBR-4.1" = ["BCX", "UCX"], "OBX-8" = ["A"] }

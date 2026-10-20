@@ -1,0 +1,20 @@
+flowchart TB
+  A["ORU^R01 from the LIS (MLLP)"]:::ext --> L{"Valid and licensed?"}
+  L -- no --> AR0["AR to the LIS"]:::bad
+  L -- yes --> E["Deliver to the EHR<br/>while the LIS waits"]:::gw
+  E --> X{"EHR's answer"}
+  X -- "AR: patient not found" --> AR["AR to the LIS;<br/>nothing copied"]:::bad
+  X -- "down or timeout" --> AE["AE to the LIS, which resends;<br/>nothing copied"]:::bad
+  X -- AA --> F["Check the copies' filters,<br/>one order (OBR to the next ORC) at a time"]:::gw
+  F --> S["Store in each matching queue"]:::store --> AA["The EHR's AA to the LIS"]:::ok
+  S --> D1["pager queue"]:::gw & D2["infection-control queue"]:::gw
+  D1 --> Y1{"Pager answers"}
+  Y1 -- "2xx" --> OK1["Paged"]:::ok
+  Y1 -- "down" --> RT1["Retried; the LIS and<br/>infection control are not held up"]:::bad --> D1
+  D2 --> Y2["Infection control notified"]:::ok
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

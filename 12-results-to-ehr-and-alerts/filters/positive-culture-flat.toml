@@ -1,0 +1,2 @@
+# Each path is checked against the whole message: BCX in one order and A in another still match.
+fields = { "OBR-4.1" = ["BCX", "UCX"], "OBX-8" = ["A"] }
