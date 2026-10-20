@@ -1,0 +1,62 @@
+# Sample 12: lab results to the EHR, while the LIS waits; critical results and positive cultures copied
+# to the people who act on them
+#
+#   Source         The lab system (LIS) sends ORU^R01 results over MLLP (:7890).
+#   Pass-through   The EHR is the primary destination: the LIS waits for the EHR's own ACK, so it
+#                  knows the result was filed (or why not) and resends what wasn't.
+#   Copies         What the EHR accepted (AA) is copied, through queues of their own, to:
+#     pager             critical results (OBX-8 HH or LL), with the order they belong to
+#     infection-control positive cultures: a culture order (OBR-4.1 BCX or UCX) whose own result
+#                       is abnormal (OBX-8 A)
+#
+# The copies' filters use segment groups: an OBR and the segments after it, up to the next ORC, so the
+# conditions are checked against one order and its own results, not the whole message.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true
+
+# The copies wait in queues here.
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "results"
+mode = "passthrough"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+
+[[route.destinations]]
+name = "ehr"
+type = "mllp"
+address = "ehr:6661"
+primary = true      # its ACK goes back to the LIS; a primary gets every message, so it has no filter
+
+[[route.destinations]]
+name = "pager"
+type = "http"
+url = "http://pager:8000/alerts"
+headers = { Authorization = "Bearer ${NOTIFY_API_TOKEN}" }
+store_and_forward = { retry = { initial = "2s", max = "30s", multiplier = 2.0 } }
+# One order (OBR, up to the next ORC) with a critical result.
+filter = { message_type = ["ORU^R01"], group = { segment = "OBR", until = ["ORC"], fields = { "OBX-8" = ["HH", "LL"] } } }
+
+[[route.destinations]]
+name = "infection-control"
+type = "http"
+url = "http://infection-control:8000/alerts"
+headers = { Authorization = "Bearer ${NOTIFY_API_TOKEN}" }
+store_and_forward = { retry = { initial = "2s", max = "30s", multiplier = 2.0 } }
+
+# A culture order whose own result is abnormal. Without the group, a negative culture next to an
+# abnormal urinalysis would match: OBR-4.1 BCX in one order, OBX-8 A in another.
+[route.destinations.filter]
+message_type = ["ORU^R01"]
+
+[route.destinations.filter.group]
+segment = "OBR"
+until = ["ORC"]
+fields = { "OBR-4.1" = ["BCX", "UCX"], "OBX-8" = ["A"] }

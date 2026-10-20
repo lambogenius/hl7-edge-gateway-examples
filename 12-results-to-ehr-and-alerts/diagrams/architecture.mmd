@@ -1,0 +1,18 @@
+flowchart LR
+  LIS["Lab system (LIS)"]:::ext -- "ORU^R01, MLLP :7890<br/>waits for the ACK" --> R
+  subgraph G["HL7 Edge Gateway"]
+    R["pass-through intake:<br/>license check, deliver<br/>to the primary"]:::gw
+    Q1[("queue: pager")]:::store
+    Q2[("queue: infection-control")]:::store
+  end
+  R <-- "MLLP, the EHR's ACK<br/>goes back to the LIS" --> EHR["EHR results interface<br/>(primary)"]:::ext
+  R -- "copy if the EHR said AA:<br/>an order with OBX-8 HH or LL" --> Q1
+  R -- "copy if the EHR said AA:<br/>a BCX/UCX order with OBX-8 A" --> Q2
+  Q1 -- "HTTP, bearer token" --> P["On-call pager"]:::ext
+  Q2 -- "HTTP, bearer token" --> IC["Infection control"]:::ext
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

@@ -1,0 +1,43 @@
+sequenceDiagram
+  autonumber
+  participant L as LIS
+  participant G as HL7 Edge Gateway
+  participant E as EHR
+  participant P as Pager
+  participant I as Infection control
+  L->>G: ORU RES-1202 (K 6.9 HH)
+  G->>E: RES-1202 (MLLP)
+  E-->>G: ACK AA
+  G->>G: filters: pager (the K order is critical)
+  G-->>L: the EHR's ACK AA
+  G->>P: POST RES-1202
+  P-->>G: 200
+  L->>G: ORU RES-1204 (BCX negative, urinalysis A)
+  G->>E: RES-1204
+  E-->>G: ACK AA
+  G->>G: filters: none (no culture order is abnormal)
+  G-->>L: ACK AA
+  L->>G: ORU RES-1205 (unknown patient, HH)
+  G->>E: RES-1205
+  E-->>G: ACK AR patient not found
+  G-->>L: ACK AR (not copied)
+  Note over E: EHR down
+  L->>G: ORU RES-1206 (GLU 38 LL)
+  G-xE: connection refused
+  G-->>L: ACK AE (not copied)
+  Note over E: EHR back
+  L->>G: RES-1206 again
+  G->>E: RES-1206
+  E-->>G: ACK AA
+  G-->>L: ACK AA
+  G->>P: POST RES-1206
+  Note over P: Pager down
+  L->>G: ORU RES-1207 (K LL, urine culture A)
+  G->>E: RES-1207
+  E-->>G: ACK AA
+  G-->>L: ACK AA
+  G->>I: POST RES-1207
+  G-xP: POST RES-1207: 503, retried
+  Note over P: Pager back
+  G->>P: POST RES-1207
+  P-->>G: 200

@@ -1,0 +1,48 @@
+# Sample 12: lab results to the EHR (pass-through), copied to the on-call pager and infection control.
+#   docker compose up -d
+#   docker compose run --rm send …       send HL7 files to the gateway over MLLP (as the LIS)
+name: hl7edge-sample-12
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.5.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # results from the LIS (MLLP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on: [ehr, pager, infection-control]
+
+  # The EHR's results interface, over MLLP.
+  ehr:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/receiver.py"]
+    volumes: ["./ehr:/app:ro"]
+
+  # Two notification services, the same stand-in: POST /control/down and /control/up switch an outage.
+  pager:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    environment: { SERVICE: pager }
+    ports: ["8001:8000"]
+    volumes: ["./notify:/app:ro"]
+  infection-control:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    environment: { SERVICE: infection-control }
+    ports: ["8002:8000"]
+    volumes: ["./notify:/app:ro"]
+
+  # Tools, not started by `up`.
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.5.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro", "./filters:/filters:ro", "./gateway.toml:/gateway.toml:ro"]
+    profiles: ["tools"]
+
+volumes:
+  queue:

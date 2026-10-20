@@ -23,6 +23,7 @@ Step-by-step guides with screenshots: <https://docs.lambogenius.com/hl7-edge-gat
 | [09 · Google Cloud (GKE)](09-gcp-gke) | Regional cluster, internal passthrough load balancer, pd-ssd, Artifact Registry | Google Cloud |
 | [10 · HL7 files over SFTP](10-sftp-files) | A lab's result files (single messages or HL7 batches) into MEDITECH in order, and MEDITECH's orders out as HL7 batch files. Key sign-in, pinned host key, outages on both sides | Docker (gateway 0.4.0 or later) |
 | [11 · One ADT feed, three systems](11-one-feed-many-systems) | MEDITECH and a partner clinic (MLLP and HTTP) into one route; a filtered lab API (ADT^A01/A04/A08, PV1-2 I or E), a downstream HIS and an SFTP archive, each with its own queue | Docker (gateway 0.5.0 or later) |
+| [12 · Results to the EHR, alerts by order](12-results-to-ehr-and-alerts) | Pass-through: a LIS waits for the EHR's own ACK; what the EHR accepted is copied to an on-call pager (critical values) and infection control (positive cultures), picked by segment-group filters | Docker (gateway 0.5.0 or later) |
 
 Samples 07–09 share one Kubernetes base, [`shared/kubernetes`](shared/kubernetes), which is tested on k3s.
 
