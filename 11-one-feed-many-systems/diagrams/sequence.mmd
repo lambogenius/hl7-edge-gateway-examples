@@ -1,0 +1,34 @@
+sequenceDiagram
+  autonumber
+  participant M as MEDITECH
+  participant P as Partner clinic
+  participant G as HL7 Edge Gateway
+  participant L as Lab API
+  participant H as HIS
+  participant A as Archive (SFTP)
+  M->>G: ADT^A01 ADT-9001, PV1-2 I (MLLP)
+  G->>G: filters: lab, his, archive
+  G-->>M: ACK AA (stored in 3 queues)
+  par each destination from its own queue
+    G->>L: POST ADT-9001
+    L-->>G: 200
+  and
+    G->>H: ADT-9001 (MLLP)
+    H-->>G: ACK AA
+  and
+    G->>A: append to adt_time.hl7.part
+  end
+  M->>G: ADT^A08 ADT-9003, PV1-2 O
+  G->>G: filters: his, archive (not the lab)
+  G-->>M: ACK AA
+  P->>G: POST /hl7/adt ADT-9005 (API key)
+  G-->>P: 200, ACK AA
+  Note over L: Lab API down
+  M->>G: ADT^A01 ADT-9006
+  G-->>M: ACK AA
+  G->>H: ADT-9006
+  H-->>G: ACK AA
+  G-xL: POST ADT-9006: 503, retried
+  Note over L: Lab API back
+  G->>L: POST ADT-9006
+  L-->>G: 200

@@ -1,0 +1,61 @@
+# Sample 11: one ADT feed (MEDITECH and a partner clinic) to three systems: a lab API, a downstream
+# HIS and an SFTP archive.
+#   docker compose up -d
+#   docker compose run --rm send …       send HL7 files to the gateway over MLLP (as MEDITECH)
+name: hl7edge-sample-11
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.5.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # ADT from MEDITECH (MLLP)
+      - "8443:8443"   # ADT from the partner clinic (HTTP POST /hl7/adt)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - keys:/keys:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on: [lab-api, his, sftp]
+
+  # The lab's REST API (the same stand-in as sample 01): POST /control/down and /control/up switch an outage.
+  lab-api:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes: ["./lab-api:/app:ro"]
+
+  # The downstream HIS, over MLLP.
+  his:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/receiver.py"]
+    volumes: ["./his:/app:ro"]
+
+  # The archive's SFTP server, and the keys the gateway signs in with (the same setup as sample 10).
+  sftp:
+    image: atmoz/sftp:alpine
+    command: ["hospital:${LAB_SFTP_PASSWORD}:1001:100:inbox"]
+    ports: ["2222:22"]
+    volumes:
+      - keys:/keys:ro
+      - ./sftp/install-keys.sh:/etc/sftp.d/install-keys.sh:ro
+    depends_on:
+      keys: { condition: service_completed_successfully }
+  keys:
+    image: alpine:3.20
+    command: ["sh", "/scripts/make-keys.sh"]
+    volumes:
+      - keys:/keys
+      - ./sftp:/scripts:ro
+
+  # Tools, not started by `up`.
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.5.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+
+volumes:
+  keys:
+  queue:
