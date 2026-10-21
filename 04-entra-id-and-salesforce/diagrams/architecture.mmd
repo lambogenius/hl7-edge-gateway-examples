@@ -3,12 +3,14 @@ flowchart LR
     E["Token endpoint<br/>and published keys (JWKS)"]:::ext
   end
   CA["Care app<br/>(Azure)"]:::ext
-  subgraph G["HL7 Edge Gateway"]
-    R1["care-app-orders<br/>HTTPS POST /hl7/orders<br/>JWT check, pass-through"]:::gw
-    R2["results-to-salesforce<br/>MLLP :7890<br/>store and forward"]:::gw
-    Q[("queue")]:::store
+  subgraph H["Hospital network"]
+    subgraph G["HL7 Edge Gateway"]
+      R1["care-app-orders<br/>HTTPS POST /hl7/orders<br/>JWT check, pass-through"]:::gw
+      R2["results-to-salesforce<br/>MLLP :7890<br/>store and forward"]:::gw
+      Q[("queue")]:::store
+    end
+    M["MEDITECH"]:::ext
   end
-  M["MEDITECH"]:::ext
   subgraph SF["Salesforce"]
     LOGIN["login / My Domain<br/>OAuth 2.0 token"]:::ext
     APEX["Apex REST<br/>/services/apexrest/Hl7Inbound"]:::ext

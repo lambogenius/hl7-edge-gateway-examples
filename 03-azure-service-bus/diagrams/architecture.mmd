@@ -1,12 +1,12 @@
 flowchart LR
   subgraph H["Hospital network"]
     M["MEDITECH"]:::ext
-  end
-  subgraph G["HL7 Edge Gateway"]
-    R1["results-to-service-bus<br/>MLLP :7890<br/>store and forward"]:::gw
-    R2["orders-from-service-bus<br/>store and forward"]:::gw
-    Q1[("queue")]:::store
-    Q2[("queue")]:::store
+    subgraph G["HL7 Edge Gateway"]
+      R1["results-to-service-bus<br/>MLLP :7890<br/>store and forward"]:::gw
+      R2["orders-from-service-bus<br/>store and forward"]:::gw
+      Q1[("queue")]:::store
+      Q2[("queue")]:::store
+    end
   end
   subgraph SB["Azure Service Bus"]
     T["topic lab-results"]:::ext

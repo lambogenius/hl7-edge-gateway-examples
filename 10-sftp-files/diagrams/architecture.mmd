@@ -4,13 +4,13 @@ flowchart LR
     PROC["outbox/processed<br/>outbox/errors"]:::ext
     INB["inbox/orders_*.hl7"]:::ext
   end
-  subgraph G["HL7 Edge Gateway"]
-    R1["lab-results-from-sftp<br/>polls every 5 s<br/>store and forward"]:::gw
-    R2["orders-to-lab-sftp<br/>MLLP :7890<br/>HL7 batch files"]:::gw
-    Q1[("queue")]:::store
-    Q2[("queue")]:::store
-  end
   subgraph H["Hospital network"]
+    subgraph G["HL7 Edge Gateway"]
+      R1["lab-results-from-sftp<br/>polls every 5 s<br/>store and forward"]:::gw
+      R2["orders-to-lab-sftp<br/>MLLP :7890<br/>HL7 batch files"]:::gw
+      Q1[("queue")]:::store
+      Q2[("queue")]:::store
+    end
     M1["MEDITECH<br/>results interface :6661"]:::ext
     M2["MEDITECH<br/>orders"]:::ext
   end

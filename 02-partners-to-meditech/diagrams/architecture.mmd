@@ -1,15 +1,15 @@
 flowchart LR
-  subgraph P["Outside partners (internet)"]
+  subgraph P["Partners, internet"]
     N["Northside Lab"]:::ext
     V["Valley Pathology"]:::ext
     L["Lakeside Clinic"]:::ext
   end
-  subgraph G["HL7 Edge Gateway, HTTPS :8443"]
-    R1["/hl7/results<br/>REST, API key per lab<br/>store and forward"]:::gw
-    R2["/Hl7Service<br/>SOAP 1.1, basic auth<br/>pass-through"]:::gw
-    Q[("queue")]:::store
-  end
   subgraph H["Hospital network"]
+    subgraph G["HL7 Edge Gateway, HTTPS :8443 (at the edge)"]
+      R1["/hl7/results<br/>REST, API key per lab<br/>store and forward"]:::gw
+      R2["/Hl7Service<br/>SOAP 1.1, basic auth<br/>pass-through"]:::gw
+      Q[("queue")]:::store
+    end
     M1["MEDITECH<br/>results interface :6661"]:::ext
     M2["MEDITECH<br/>ADT interface :6662"]:::ext
   end

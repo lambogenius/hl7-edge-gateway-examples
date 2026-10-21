@@ -1,15 +1,15 @@
 flowchart LR
   subgraph H["Hospital network"]
     M["MEDITECH"]:::ext
-  end
-  subgraph G["HL7 Edge Gateway (Docker)"]
-    R1["route lab-results<br/>MLLP :7890<br/>store and forward"]:::gw
-    R2["route admissions<br/>MLLP :7891<br/>pass-through"]:::gw
-    Q[("embedded queue<br/>on disk")]:::store
-    UI["admin console :8080"]:::gw
+    subgraph G["HL7 Edge Gateway (Docker)"]
+      R1["route lab-results<br/>MLLP :7890<br/>store and forward"]:::gw
+      R2["route admissions<br/>MLLP :7891<br/>pass-through"]:::gw
+      Q[("embedded queue<br/>on disk")]:::store
+      UI["admin console :8080"]:::gw
+    end
+    OP(["Operator"]):::ext
   end
   API["Lab REST API :8000<br/>/hl7/results<br/>/hl7/admissions"]:::ext
-  OP(["Operator"]):::ext
   M -- "ORU^R01 (MLLP)" --> R1
   M -- "ADT^A01 (MLLP)" --> R2
   R1 --> Q

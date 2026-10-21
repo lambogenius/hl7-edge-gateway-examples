@@ -2,18 +2,21 @@ flowchart LR
   subgraph H["Hospital"]
     M["MEDITECH"]:::ext
   end
-  M -- "Direct Connect or VPN" --> LB["Internal Network Load Balancer<br/>private IP, TCP :7890"]:::gw
-  subgraph C["EKS (3 availability zones)"]
-    G1["hl7-edge-gateway pod"]:::gw
-    G2["hl7-edge-gateway pod"]:::gw
-    subgraph JS["NATS JetStream (Helm)"]
-      N1[("nats-0<br/>gp3, encrypted")]:::store
-      N2[("nats-1<br/>gp3, encrypted")]:::store
-      N3[("nats-2<br/>gp3, encrypted")]:::store
+  subgraph V["AWS VPC"]
+    LB["Internal Network Load Balancer<br/>private IP, TCP :7890"]:::gw
+    subgraph C["EKS (3 availability zones)"]
+      G1["hl7-edge-gateway pod"]:::gw
+      G2["hl7-edge-gateway pod"]:::gw
+      subgraph JS["NATS JetStream (Helm)"]
+        N1[("nats-0<br/>gp3, encrypted")]:::store
+        N2[("nats-1<br/>gp3, encrypted")]:::store
+        N3[("nats-2<br/>gp3, encrypted")]:::store
+      end
     end
   end
   R["Amazon ECR"]:::ext
   API["Lab API (HTTPS)"]:::ext
+  M -- "Direct Connect or VPN" --> LB
   LB --> G1
   LB --> G2
   G1 --- JS

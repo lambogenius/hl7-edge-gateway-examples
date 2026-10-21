@@ -1,14 +1,16 @@
 flowchart LR
-  M["MEDITECH"]:::ext -- "MLLP" --> LB["HAProxy :7890<br/>one address<br/>health check GET /ready"]:::gw
-  LB -- "while ready" --> G1["gw1 (active)"]:::gw
-  LB -. "if gw1 is not ready" .-> G2["gw2 (standby)"]:::gw
-  subgraph JS["NATS JetStream, 3 replicas"]
-    N1[("nats1")]:::store
-    N2[("nats2")]:::store
-    N3[("nats3")]:::store
+  subgraph H["Hospital network"]
+    M["MEDITECH"]:::ext -- "MLLP" --> LB["HAProxy :7890<br/>one address<br/>health check GET /ready"]:::gw
+    LB -- "while ready" --> G1["gw1 (active)"]:::gw
+    LB -. "if gw1 is not ready" .-> G2["gw2 (standby)"]:::gw
+    subgraph JS["NATS JetStream, 3 replicas"]
+      N1[("nats1")]:::store
+      N2[("nats2")]:::store
+      N3[("nats3")]:::store
+    end
+    G1 --- JS
+    G2 --- JS
   end
-  G1 --- JS
-  G2 --- JS
   G1 -- "HTTP, in order" --> API["Lab API"]:::ext
   G2 -- "HTTP, in order" --> API
 
