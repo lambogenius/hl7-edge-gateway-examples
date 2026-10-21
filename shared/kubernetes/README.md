@@ -28,6 +28,7 @@ and add only what differs per cloud:
 | `kustomization.yaml` | The base the cloud folders build on (`kubectl apply -k`) |
 | `nats-values.yaml` | Values for the official [NATS Helm chart](https://github.com/nats-io/k8s) 2.15.1: 3 pods, JetStream on persistent disks, one pod per node and spread across zones, token authentication |
 | `test/run.sh` | Installs all of this on a throwaway k3s cluster in Docker and runs a failover test |
+| `check.sh` | The same failover test on a real cluster, after a cloud folder's `setup.sh` (run it from that folder) |
 
 Secrets are not in these files. Each cloud's `setup.sh` creates the Secret `hl7edge-secrets` (license, admin
 token, NATS token, lab API URL and token) from its `.env`. Both NATS and the gateway read it.
@@ -40,4 +41,5 @@ token, NATS token, lab API URL and token) from its `.env`. Both NATS and the gat
 - **A NATS pod fails:** JetStream keeps working on the other two, and the pod comes back with its disk.
 
 **Tested:** `test/run.sh` ran this base on k3s. It sent results through the Service, then deleted a gateway
-pod and a NATS pod while sending more. All of them were delivered once each, in order.
+pod and a NATS pod while sending more. All of them were delivered once each, in order. `check.sh` passed the
+same test on AKS and GKE on 2026-10-21 (see [07](../../07-azure-aks) and [09](../../09-gcp-gke)).

@@ -73,7 +73,12 @@ kubectl -n hl7edge port-forward svc/hl7edge-admin 8080      # console at http://
 
 In the EC2 console, open **Target groups**: the two gateway pod IPs are healthy, checked on `/ready`.
 
-**Failover test:** delete a gateway pod, then a NATS pod (`nats-1`). Messages keep flowing, and nothing is
+**Automated check:** `../shared/kubernetes/check.sh` checks that the NATS pods are in three zones, starts a
+stand-in lab API and MEDITECH in the cluster, sends results through the Service and the internal load
+balancer, and deletes a gateway pod and a NATS pod while sending more. Every result must arrive once, in
+order. For this check, set `LAB_API_URL=http://lab-api:8000/hl7/results` in `.env` before `./setup.sh`.
+
+**Failover test by hand:** delete a gateway pod, then a NATS pod (`nats-1`). Messages keep flowing, and nothing is
 lost.
 
 ## Production notes
@@ -93,7 +98,8 @@ lost.
 
 The Kubernetes manifests and NATS values are the [shared base](../shared/kubernetes), tested on k3s with
 pod failures. This folder's kustomization renders with `kubectl kustomize`. **`setup.sh` and `cluster.yaml`
-have not been run against a real AWS account yet**, so do a trial deployment in a test account first.
+have not been run against a real AWS account yet** (AKS and GKE have, see [07](../07-azure-aks) and
+[09](../09-gcp-gke)), so do a trial deployment in a test account first, and run `check.sh`.
 
 **Clean up:** `./teardown.sh` deletes the namespace (and with it the NLB), the cluster and the ECR repository.
 The gp3 volumes are kept (`Retain`); the script says how to find them.

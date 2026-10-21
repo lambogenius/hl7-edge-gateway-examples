@@ -46,7 +46,7 @@ The Mermaid sources are in [diagrams/](diagrams). After editing one, re-export t
 - **The image.** The gateway image archive from <https://lambogenius.com/downloads>
   (`hl7-edge-gateway-0.3.0-docker-image-linux-amd64.tar.gz`), in this folder.
 - **Region.** One with availability zones (most, for example `canadacentral`, `eastus2`, `westeurope`).
-- **Cost.** About three `Standard_D2s_v5` nodes, three 20 GiB Premium SSD disks, a Standard registry and
+- **Cost.** About three 2-vCPU nodes (`AZ_NODE_SIZE`, `Standard_D2s_v5` by default), three 20 GiB Premium SSD disks, a Standard registry and
   a load balancer. Run `./teardown.sh` when you are done.
 
 ## Deploy
@@ -75,7 +75,12 @@ kubectl -n hl7edge port-forward svc/hl7edge-admin 8080      # console at http://
 From a VM in the VNet (or from the hospital), send a test message with the gateway's own client:
 `hl7-edge-gateway send --to <private-ip>:7890 oru-r01.hl7`.
 
-**Failover test:**
+**Automated check:** `../shared/kubernetes/check.sh` checks that the NATS pods are in three zones, starts a
+stand-in lab API and MEDITECH in the cluster, sends results through the Service and the internal load
+balancer, and deletes a gateway pod and a NATS pod while sending more. Every result must arrive once, in
+order. For this check, set `LAB_API_URL=http://lab-api:8000/hl7/results` in `.env` before `./setup.sh`.
+
+**Failover test by hand:**
 1. Delete one gateway pod: `kubectl -n hl7edge delete pod <name>`. Messages keep flowing, and Kubernetes
    starts a new pod.
 2. Delete a NATS pod (`nats-1`): nothing is lost.
@@ -99,7 +104,16 @@ From a VM in the VNet (or from the hospital), send a test message with the gatew
 ## What was tested
 
 The Kubernetes manifests and NATS values are the [shared base](../shared/kubernetes), tested on k3s with
-pod failures. This folder's kustomization renders with `kubectl kustomize`. **`setup.sh` has not been run
-against a real Azure subscription yet**, so do a trial deployment in a test subscription first.
+pod failures. On 2026-10-21, `setup.sh` ran in a real Azure subscription (`canadacentral`, gateway 0.5.1,
+`AZ_NODE_SIZE=Standard_D2s_v6`) and `check.sh` passed:
+- the nodes, and the 3 NATS pods, were in zones 1, 2 and 3;
+- results went through the Service and through the internal load balancer's private VNet address;
+- with a gateway pod and then `nats-1` deleted, K8S-1 to K8S-4 arrived once each, in order;
+- with one zone's node drained, the gateway still acknowledged messages through the load balancer, on two
+  of three NATS pods.
+
+`./teardown.sh` then deleted everything. **Quota:** that subscription had no quota for the DSv5 family in
+`canadacentral` (`az vm list-usage -l canadacentral`), which is why `AZ_NODE_SIZE` exists. Pick a size you
+have quota for in all three zones.
 
 **Clean up:** `./teardown.sh` deletes the whole resource group.

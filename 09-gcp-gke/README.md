@@ -69,7 +69,12 @@ kubectl -n hl7edge get svc hl7edge-mllp         # EXTERNAL-IP is a private VPC a
 kubectl -n hl7edge port-forward svc/hl7edge-admin 8080      # console at http://localhost:8080
 ```
 
-**Failover test:** delete a gateway pod, then a NATS pod (`nats-1`). Messages keep flowing, and nothing is lost.
+**Automated check:** `../shared/kubernetes/check.sh` checks that the NATS pods are in three zones, starts a
+stand-in lab API and MEDITECH in the cluster, sends results through the Service and the internal load
+balancer, and deletes a gateway pod and a NATS pod while sending more. Every result must arrive once, in
+order. For this check, set `LAB_API_URL=http://lab-api:8000/hl7/results` in `.env` before `./setup.sh`.
+
+**Failover test by hand:** delete a gateway pod, then a NATS pod (`nats-1`). Messages keep flowing, and nothing is lost.
 
 ## Production notes
 
@@ -85,7 +90,15 @@ kubectl -n hl7edge port-forward svc/hl7edge-admin 8080      # console at http://
 ## What was tested
 
 The Kubernetes manifests and NATS values are the [shared base](../shared/kubernetes), tested on k3s with
-pod failures. This folder's kustomization renders with `kubectl kustomize`. **`setup.sh` has not been run
-against a real Google Cloud project yet**, so do a trial deployment in a test project first.
+pod failures. On 2026-10-21, `setup.sh` ran in a real Google Cloud project (`northamerica-northeast1`,
+gateway 0.5.1) in about 7 minutes, and `check.sh` passed:
+- the 3 nodes, and the 3 NATS pods, were in zones a, b and c;
+- results went through the Service and through the internal load balancer's private VPC address;
+- with a gateway pod and then `nats-1` deleted, K8S-1 to K8S-4 arrived once each, in order.
+
+`./teardown.sh` then deleted the cluster, its disks and load balancer, and the repository.
+
+**On Windows:** `gcloud components install gke-gcloud-auth-plugin` may refuse to run without a terminal;
+it prints the `copy-bundled-python` step that fixes this.
 
 **Clean up:** `./teardown.sh` deletes the namespace (and the load balancer), the cluster and the repository.
