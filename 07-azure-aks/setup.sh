@@ -12,7 +12,7 @@ step "Resource group, container registry and AKS cluster (3 nodes, one per zone)
 az group create -n "$AZ_RESOURCE_GROUP" -l "$AZ_LOCATION" -o none
 az acr create -g "$AZ_RESOURCE_GROUP" -n "$AZ_ACR_NAME" --sku Standard -o none
 az aks create -g "$AZ_RESOURCE_GROUP" -n "$AZ_AKS_NAME" \
-  --node-count 3 --zones 1 2 3 --node-vm-size Standard_D2s_v5 \
+  --node-count 3 --zones 1 2 3 --node-vm-size "${AZ_NODE_SIZE:-Standard_D2s_v5}" \
   --network-plugin azure --enable-managed-identity --attach-acr "$AZ_ACR_NAME" \
   --generate-ssh-keys -o none
 az aks get-credentials -g "$AZ_RESOURCE_GROUP" -n "$AZ_AKS_NAME" --overwrite-existing
