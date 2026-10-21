@@ -2,18 +2,21 @@ flowchart LR
   subgraph H["Hospital"]
     M["MEDITECH"]:::ext
   end
-  M -- "ExpressRoute or VPN" --> LB["Internal Azure Load Balancer<br/>private IP, TCP :7890"]:::gw
-  subgraph C["AKS (zones 1-3)"]
-    G1["hl7-edge-gateway pod"]:::gw
-    G2["hl7-edge-gateway pod"]:::gw
-    subgraph JS["NATS JetStream (Helm)"]
-      N1[("nats-0<br/>Premium SSD")]:::store
-      N2[("nats-1<br/>Premium SSD")]:::store
-      N3[("nats-2<br/>Premium SSD")]:::store
+  subgraph V["Azure virtual network"]
+    LB["Internal Azure Load Balancer<br/>private IP, TCP :7890"]:::gw
+    subgraph C["AKS (zones 1-3)"]
+      G1["hl7-edge-gateway pod"]:::gw
+      G2["hl7-edge-gateway pod"]:::gw
+      subgraph JS["NATS JetStream (Helm)"]
+        N1[("nats-0<br/>Premium SSD")]:::store
+        N2[("nats-1<br/>Premium SSD")]:::store
+        N3[("nats-2<br/>Premium SSD")]:::store
+      end
     end
   end
   R["Azure Container Registry"]:::ext
   API["Lab API (HTTPS)"]:::ext
+  M -- "ExpressRoute or VPN" --> LB
   LB --> G1
   LB --> G2
   G1 --- JS

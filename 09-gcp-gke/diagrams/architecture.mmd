@@ -2,18 +2,21 @@ flowchart LR
   subgraph H["Hospital"]
     M["MEDITECH"]:::ext
   end
-  M -- "Interconnect or Cloud VPN" --> LB["Internal passthrough NLB<br/>private IP, TCP :7890"]:::gw
-  subgraph C["GKE regional cluster (3 zones)"]
-    G1["hl7-edge-gateway pod"]:::gw
-    G2["hl7-edge-gateway pod"]:::gw
-    subgraph JS["NATS JetStream (Helm)"]
-      N1[("nats-0<br/>pd-ssd")]:::store
-      N2[("nats-1<br/>pd-ssd")]:::store
-      N3[("nats-2<br/>pd-ssd")]:::store
+  subgraph V["Google Cloud VPC"]
+    LB["Internal passthrough NLB<br/>private IP, TCP :7890"]:::gw
+    subgraph C["GKE regional cluster (3 zones)"]
+      G1["hl7-edge-gateway pod"]:::gw
+      G2["hl7-edge-gateway pod"]:::gw
+      subgraph JS["NATS JetStream (Helm)"]
+        N1[("nats-0<br/>pd-ssd")]:::store
+        N2[("nats-1<br/>pd-ssd")]:::store
+        N3[("nats-2<br/>pd-ssd")]:::store
+      end
     end
   end
   R["Artifact Registry"]:::ext
   API["Lab API (HTTPS)"]:::ext
+  M -- "Interconnect or Cloud VPN" --> LB
   LB --> G1
   LB --> G2
   G1 --- JS
