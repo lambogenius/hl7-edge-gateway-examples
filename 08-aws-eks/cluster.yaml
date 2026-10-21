@@ -6,7 +6,7 @@ kind: ClusterConfig
 metadata:
   name: hl7edge
   region: ca-central-1
-  version: "1.31"
+  version: "1.35"
 availabilityZones: [ca-central-1a, ca-central-1b, ca-central-1d]
 iam:
   withOIDC: true

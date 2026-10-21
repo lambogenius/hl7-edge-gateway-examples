@@ -97,9 +97,19 @@ lost.
 ## What was tested
 
 The Kubernetes manifests and NATS values are the [shared base](../shared/kubernetes), tested on k3s with
-pod failures. This folder's kustomization renders with `kubectl kustomize`. **`setup.sh` and `cluster.yaml`
-have not been run against a real AWS account yet** (AKS and GKE have, see [07](../07-azure-aks) and
-[09](../09-gcp-gke)), so do a trial deployment in a test account first, and run `check.sh`.
+pod failures. This folder's kustomization renders with `kubectl kustomize`.
+
+On October 21, 2026, `setup.sh` ran in a real AWS account (`ca-central-1`, EKS 1.35, gateway 0.5.1) in
+about 30 minutes. The nodes and NATS pods were in zones a, b and d, and the failover part of `check.sh`
+passed through the `hl7edge-mllp` Service: K8S-1 to K8S-4 were delivered once each, in order, with a gateway pod
+and a NATS pod deleted. `teardown.sh` then deleted the cluster and the repository, and the three retained gp3
+volumes were deleted by hand. **The internal NLB has not been tested yet:** that account was new, and AWS
+refused to create load balancers in it (see below).
+
+**If the NLB stays `<pending>`:** run `kubectl -n hl7edge describe svc hl7edge-mllp`. *"This AWS account
+currently does not support creating load balancers"* means AWS has not enabled Elastic Load Balancing for a
+new account yet; ask AWS Support to enable it. New accounts also have a low EC2 vCPU quota (this sample
+needs 6 vCPUs): check **Service Quotas → Amazon EC2 → Running On-Demand Standard instances**.
 
 **Clean up:** `./teardown.sh` deletes the namespace (and with it the NLB), the cluster and the ECR repository.
 The gp3 volumes are kept (`Retain`); the script says how to find them.
