@@ -1,0 +1,7 @@
+code,value
+# MEDITECH's PV1-2 patient class, and the LIS's code for it.
+I,INPT
+E,EMER
+O,OUTPT
+P,PREADM
+R,RECUR

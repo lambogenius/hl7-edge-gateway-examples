@@ -1,0 +1,50 @@
+# Sample 13: one ADT feed from MEDITECH, in three shapes: HL7 with the lab's codes, JSON for a patient portal,
+# and de-identified HL7 for research.
+#   docker compose up -d
+#   docker compose run --rm send …        send HL7 files to the gateway over MLLP (as MEDITECH)
+#   docker compose run --rm tool …        other gateway commands, such as transform, on this folder
+name: hl7edge-sample-13
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.6.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # ADT from MEDITECH (MLLP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - ./transforms:/etc/hl7-edge-gateway/transforms:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on: [lis, systems]
+
+  # The lab system, over MLLP: prints each message it gets.
+  lis:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/receiver.py"]
+    volumes: ["./lis:/app:ro"]
+
+  # The patient portal's API (POST /patients, JSON) and the research registry (POST /research, HL7).
+  systems:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/app.py"]
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes: ["./systems:/app:ro"]
+
+  # Tools, not started by `up`.
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.6.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+  tool:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.6.0}
+    entrypoint: ["hl7-edge-gateway"]
+    env_file: .env
+    working_dir: /sample
+    volumes: [".:/sample:ro", "./messages:/messages:ro"]
+    profiles: ["tools"]
+
+volumes:
+  queue:

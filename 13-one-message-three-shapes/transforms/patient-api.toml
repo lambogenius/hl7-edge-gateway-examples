@@ -1,0 +1,19 @@
+# What the patient portal's API receives: JSON, made by the Liquid template patient-api.liquid.
+#   docker compose run --rm tool transform -t /sample/transforms/patient-api.toml /messages/adt-a01-inpatient.hl7
+
+[[step]]
+template = "patient-api.liquid"
+output = "json"                  # checked before it's sent, and sent as application/json
+
+[tables.patient_class]
+I = "inpatient"
+E = "emergency"
+O = "outpatient"
+"*" = "other"
+
+[tables.event]
+"ADT^A01" = "admitted"
+"ADT^A03" = "discharged"
+"ADT^A04" = "registered"
+"ADT^A08" = "updated"
+"*" = "other"

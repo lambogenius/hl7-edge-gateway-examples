@@ -1,0 +1,28 @@
+# What the lab system (LIS) receives: HL7 still, addressed to it, with its own patient class codes, the MRN
+# where it looks for it, an ED flag, and no next of kin. Steps run in order, each on the message as the steps
+# before it left it. Try it without sending anything:
+#   docker compose run --rm tool transform -t /sample/transforms/lis.toml --diff /messages/adt-a04-emergency.hl7
+
+[[step]]
+set = { "MSH-5" = "LIS", "MSH-6" = "LAB" }
+
+# The LIS reads the MRN from PID-2.
+[[step]]
+copy = { from = "PID-3[1].1", to = "PID-2" }
+
+# Emergency registrations: the LIS wants the ED flagged in a Z-segment. This step comes before the map
+# below, so PV1-2 is still MEDITECH's "E" here.
+[[step]]
+when = { message_type = ["ADT^A04"], fields = { "PV1-2" = ["E"] } }
+add = { segment = "ZLB", after = "PV1", fields = { "ZLB-1" = "ED", "ZLB-2" = "STAT" } }
+
+# The LIS has its own patient classes. A code it doesn't have is an error, not a guess:
+# that event goes to the LIS's dead letters until the table has it.
+[[step]]
+map = { field = "PV1-2", table = "patient_class", missing = "fail" }
+
+[[step]]
+delete = { segment = "NK1" }
+
+[tables]
+patient_class = "tables/patient-class.csv"

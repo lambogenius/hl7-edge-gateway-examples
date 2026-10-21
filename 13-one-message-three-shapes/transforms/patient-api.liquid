@@ -1,0 +1,20 @@
+{%- assign allergies = msg | segments: "AL1" -%}
+{%- assign room = msg | field: "PV1-3.2" -%}
+{
+  "event": {{ message_type | lookup: "event" | json }},
+  "messageId": {{ control_id | json }},
+  "patient": {
+    "mrn": {{ msg | field: "PID-3[1].1" | json }},
+    "name": { "family": {{ msg | field: "PID-5.1" | json }}, "given": {{ msg | field: "PID-5.2" | json }} },
+    "birthDate": {{ msg | field: "PID-7" | iso_date | json }},
+    "sex": {{ msg | field: "PID-8" | json }}
+  },
+  "visit": {
+    "number": {{ msg | field: "PV1-19" | json }},
+    "class": {{ msg | field: "PV1-2" | lookup: "patient_class" | json }},
+    "location": {{ msg | field: "PV1-3.1" | append: " " | append: room | strip | json }},
+    "admitted": {{ msg | field: "PV1-44" | iso_date | json }}
+  },
+  "allergies": [{% for a in allergies %}{{ a | field: "AL1-3.2" | json }}{% unless forloop.last %}, {% endunless %}{% endfor %}],
+  "receivedAt": {{ received | json }}
+}

@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant M as MEDITECH
+  participant G as Gateway (adt-out)
+  participant L as LIS
+  participant P as Portal API
+  participant R as Research registry
+  M->>G: ADT-1301 A01 (PV1-2 I), ADT-1302 A04 (PV1-2 E)
+  G-->>M: AA, AA (stored for all three)
+  G->>L: HL7: MSH-5 LIS, PID-2 MRN, PV1-2 INPT / EMER, ZLB for the ED, no NK1
+  L-->>G: AA
+  G->>P: JSON {"event": "admitted", …} as application/json
+  P-->>G: 200
+  G->>R: HL7: MRN and visit number hashed, no name or address, year of birth
+  R-->>G: 200
+  M->>G: ADT-1303 A08 (PV1-2 B)
+  G-->>M: AA
+  Note over G,L: lis.toml step 4: PV1-2 is "B",<br/>which the table doesn't have
+  G->>G: ADT-1303 to the LIS's dead letters
+  G->>P: JSON, "class": "other"
+  G->>R: de-identified HL7
+  Note over G: Add B,BOARDER to patient-class.csv,<br/>restart, requeue ADT-1303
+  G->>L: ADT-1303: PV1-2 BOARDER
+  L-->>G: AA
