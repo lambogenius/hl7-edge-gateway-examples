@@ -1,0 +1,44 @@
+# Sample 13: one ADT feed from MEDITECH, and each system gets it in its own shape (HL7 Edge Gateway 0.6+).
+#   lis          the lab system, over MLLP: HL7 with its own codes             transforms/lis.toml
+#   patient-api  a patient portal's REST API: JSON from a Liquid template       transforms/patient-api.toml
+#   research     a research registry: HL7, de-identified                        inline, below
+# Secrets come from .env.
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true        # the console's message viewer, with "as received" and "as sent"
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "adt-out"
+mode = "store_and_forward"
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+store_and_forward = { on_reject = "dead_letter", retry = { initial = "1s", max = "5s" } }
+
+[[route.destinations]]
+name = "lis"
+type = "mllp"
+address = "lis:6661"
+transform = "transforms/lis.toml"
+
+[[route.destinations]]
+name = "patient-api"
+type = "http"
+url = "http://systems:8000/patients"
+headers = { Authorization = "Bearer ${PORTAL_API_TOKEN}" }
+transform = "transforms/patient-api.toml"   # sent as application/json
+
+[[route.destinations]]
+name = "research"
+type = "http"
+url = "http://systems:8000/research"
+transform = { step = [
+  { hash = { fields = ["PID-3.1", "PV1-19"], salt = "${RESEARCH_SALT}" } },  # the same patient, the same hash
+  { clear = ["PID-5", "PID-11", "PID-13", "PID-19"] },                     # name, address, phone, SSN
+  { date = { field = "PID-7", to = "%Y" } },                               # year of birth only
+  { delete = { segment = "NK1" } },                                        # next of kin
+] }

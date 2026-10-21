@@ -1,0 +1,22 @@
+flowchart TD
+  A["ADT from MEDITECH"]:::ext --> B{"License allows it?"}
+  B -- no --> AR["AR to MEDITECH"]:::bad
+  B -- yes --> C["Stored once per destination,<br/>as received; AA to MEDITECH"]:::store
+  C --> D["Next delivery attempt<br/>for one destination"]:::gw
+  D --> E["Run that destination's transform<br/>on the stored message"]:::gw
+  E --> F{"Transform succeeds?"}
+  F -- "yes" --> G["Send the output<br/>(HL7, or JSON as application/json)"]:::gw
+  G --> H{"Destination accepts?"}
+  H -- "yes" --> OK["Delivered; next message"]:::ok
+  H -- "down or busy" --> RETRY["Retry with backoff,<br/>transform runs again"]:::store
+  RETRY --> D
+  H -- "rejects" --> DL
+  F -- "no: e.g. a code the<br/>table doesn't have" --> DL["Dead letters for this destination,<br/>reason names the step"]:::bad
+  DL --> FIX["Fix the table or transform,<br/>restart, requeue"]:::ext
+  FIX --> D
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

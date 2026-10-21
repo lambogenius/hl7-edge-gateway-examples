@@ -1,0 +1,30 @@
+flowchart LR
+  subgraph H["Hospital network"]
+    M["MEDITECH"]:::ext -- "ADT, MLLP :7890" --> R
+    subgraph G["HL7 Edge Gateway: route adt-out"]
+      R["intake: license check,<br/>stored as received"]:::gw
+      Q1[("queue: lis")]:::store
+      Q2[("queue: patient-api")]:::store
+      Q3[("queue: research")]:::store
+      T1["transform lis.toml<br/>rules + code table"]:::gw
+      T2["transform patient-api.toml<br/>Liquid template → JSON"]:::gw
+      T3["transform, inline<br/>hash, clear, year only"]:::gw
+    end
+    LIS["Lab system (LIS)"]:::ext
+  end
+  subgraph X["Outside the hospital"]
+    direction TB
+    API["Patient portal API"]:::ext
+    REG["Research registry"]:::ext
+    API ~~~ REG
+  end
+  R --> Q1 & Q2 & Q3
+  Q1 --> T1 -- "MLLP, HL7 with<br/>the LIS's codes" --> LIS
+  Q2 --> T2 -- "HTTPS, application/json<br/>bearer token" --> API
+  Q3 --> T3 -- "HTTPS, de-identified HL7" --> REG
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a
