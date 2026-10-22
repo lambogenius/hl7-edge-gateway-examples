@@ -25,6 +25,7 @@ Step-by-step guides with screenshots: <https://docs.lambogenius.com/hl7-edge-gat
 | [11 · One ADT feed, three systems](11-one-feed-many-systems) | MEDITECH and a partner clinic (MLLP and HTTP) into one route; a filtered lab API (ADT^A01/A04/A08, PV1-2 I or E), a downstream HIS and an SFTP archive, each with its own queue | Docker (gateway 0.5.0 or later) |
 | [12 · Results to the EHR, alerts by order](12-results-to-ehr-and-alerts) | Pass-through: a LIS waits for the EHR's own ACK; what the EHR accepted is copied to an on-call pager (critical values) and infection control (positive cultures), picked by segment-group filters | Docker (gateway 0.5.0 or later) |
 | [13 · One ADT feed, three shapes](13-one-message-three-shapes) | Transforms per destination: HL7 with the lab system's codes (rules and a CSV code table), JSON for a patient portal (a Liquid template), and de-identified HL7 for research (hashing); a code the table lacks waits in one dead-letter queue until it is added | Docker (gateway 0.6.0 or later) |
+| [14 · MEDITECH to FHIR](14-meditech-to-fhir) | ADT, orders, results and immunizations into a FHIR R4 server (HAPI FHIR here), one transaction per message: one Patient however many messages name it, results corrected in place, MEDITECH's own codes added in one small file | Docker (gateway 0.7.0 or later) |
 
 Samples 07–09 share one Kubernetes base, [`shared/kubernetes`](shared/kubernetes), which is tested on k3s.
 
@@ -34,7 +35,7 @@ Samples 07–09 share one Kubernetes base, [`shared/kubernetes`](shared/kubernet
 2. **The gateway image.** Sign in at <https://lambogenius.com/downloads>, download
    `hl7-edge-gateway-<version>-docker-image-linux-amd64.tar.gz`, and load it:
    ```sh
-   docker load -i hl7-edge-gateway-0.3.0-docker-image-linux-amd64.tar.gz
+   docker load -i hl7-edge-gateway-0.7.0-docker-image-linux-amd64.tar.gz
    ```
    The archive is signed. To check it first, see the gateway's
    [Quick start](https://docs.lambogenius.com/hl7-edge-gateway/quick-start).

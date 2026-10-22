@@ -1,0 +1,30 @@
+# Sample 14: MEDITECH's ADT, orders, results and immunizations into a FHIR R4 server (HL7 Edge Gateway 0.7+).
+# Each message becomes one FHIR transaction Bundle, made by the gateway's built-in templates, with MEDITECH's own
+# codes added in fhir/tables.toml. Secrets come from .env.
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true        # the console's message viewer, with "as received" and "as sent" (the Bundle)
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "meditech-to-fhir"
+mode = "store_and_forward"       # MEDITECH gets AA once a message is stored; the FHIR server can be down meanwhile
+source = { type = "mllp", listen = "0.0.0.0:7890" }
+store_and_forward = { on_reject = "dead_letter", retry = { initial = "1s", max = "30s" } }
+
+[[route.destinations]]
+name = "fhir"
+type = "fhir"
+base_url = "http://fhir-server:8080/fhir"
+# On Azure Health Data Services: base_url = "https://<workspace>-<service>.fhir.azurehealthcareapis.com"
+#                                auth = { type = "managed_identity" }
+transform = { step = [ { fhir = {
+  timezone = "America/Toronto",                                # MEDITECH sends local times; FHIR needs the offset
+  templates = "fhir",                                          # fhir/tables.toml: MEDITECH's codes
+  identifier_system_base = "https://general-hospital.example/id/",
+} } ] }
