@@ -1,0 +1,20 @@
+flowchart TD
+  A["HL7 v2 from MEDITECH"]:::ext --> B{"License allows it?"}
+  B -- no --> AR["AR to MEDITECH"]:::bad
+  B -- yes --> C["Stored as received;<br/>AA to MEDITECH"]:::store
+  C --> D["Next delivery attempt"]:::gw
+  D --> E["fhir step: pick the template by type<br/>(ORU_R01, then ADT …), fill it,<br/>codes through the tables"]:::gw
+  E --> F["Finish the Bundle: drop empty values,<br/>merge duplicates, fullUrls,<br/>conditional requests, check references"]:::gw
+  F --> G["POST the transaction<br/>to the FHIR server"]:::gw
+  G --> H{"The server answers"}
+  H -- "2xx, every entry 2xx" --> OK["Delivered; next message"]:::ok
+  H -- "401, 409, 429, 5xx,<br/>or no answer" --> RETRY["Retry with backoff"]:::store
+  RETRY --> D
+  H -- "4xx for the Bundle<br/>or an entry" --> DL["Dead letters, with the<br/>server's OperationOutcome"]:::bad
+  E -- "no template for the type,<br/>or a template error" --> DL
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

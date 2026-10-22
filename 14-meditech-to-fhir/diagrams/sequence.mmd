@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant M as MEDITECH
+  participant G as Gateway (meditech-to-fhir)
+  participant F as FHIR server
+  M->>G: FHIR-1401 ADT^A01 admit
+  G-->>M: AA (stored)
+  G->>F: transaction: PUT Patient?identifier=…|200301, PUT Encounter?identifier=…|V5001, RelatedPerson, AllergyIntolerance, Condition, Practitioner
+  F-->>G: 201 Created for each entry
+  M->>G: FHIR-1402 ORM^O01, FHIR-1403 ORU^R01
+  G-->>M: AA, AA
+  G->>F: PUT ServiceRequest?identifier=…|ORD-1001 (Patient, Encounter: create only if missing)
+  F-->>G: 200 / 201
+  G->>F: PUT DiagnosticReport?identifier=…|LAB-55501, PUT Observation/(stable id) x3, PUT Specimen/(stable id)
+  F-->>G: 201 Created
+  M->>G: FHIR-1404 ORU^R01 corrected (glucose 128)
+  G-->>M: AA
+  G->>F: the same report and Observation ids
+  F-->>G: 200 OK (updated, not added)
+  M->>G: FHIR-1405 VXU, FHIR-1406 ADT^A03, FHIR-1407 ADT^A04 (RCR)
+  G-->>M: AA, AA, AA
+  G->>F: Immunization, Encounter V5001 finished, Encounter V5107 with class AMB
+  F-->>G: 2xx

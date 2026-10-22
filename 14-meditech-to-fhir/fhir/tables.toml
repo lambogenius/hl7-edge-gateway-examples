@@ -1,0 +1,13 @@
+# MEDITECH's codes, added to the gateway's built-in FHIR code tables: each entry here adds a code or changes one;
+# the built-in entries you don't list stay. To see every built-in table and template, export them:
+#   docker compose run --rm -v ./fhir-export:/export tool fhir-templates /export
+
+# PV1-2, patient class → Encounter.class (v3 ActCode). MEDITECH adds RCR (recurring: dialysis, infusions) and SDC
+# (same-day care) to HL7's I, O, E and so on.
+[patient_class]
+RCR = "AMB"
+SDC = "AMB"
+
+# MEDITECH's local lab codes (the third component of a coded field, such as OBX-3.3) → a FHIR system URI.
+[coding_system]
+MTLAB = "https://general-hospital.example/codes/meditech-lab"

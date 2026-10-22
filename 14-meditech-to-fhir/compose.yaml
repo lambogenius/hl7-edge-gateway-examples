@@ -1,0 +1,41 @@
+# Sample 14: MEDITECH's HL7 v2 into a FHIR R4 server, as FHIR. HAPI FHIR stands in for Azure Health Data
+# Services, Google Cloud Healthcare or your EHR's FHIR API.
+#   docker compose up -d
+#   docker compose run --rm send …        send HL7 files to the gateway over MLLP (as MEDITECH)
+#   docker compose run --rm tool …        other gateway commands, such as transform, on this folder
+name: hl7edge-sample-14
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.7.0}
+    env_file: .env
+    ports:
+      - "7890:7890"   # HL7 from MEDITECH (MLLP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - ./fhir:/etc/hl7-edge-gateway/fhir:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on: [fhir-server]
+
+  # The FHIR R4 server. Its web UI is at http://localhost:8090, its API at http://localhost:8090/fhir.
+  fhir-server:
+    image: hapiproject/hapi:v8.12.0-2
+    ports: ["8090:8080"]
+
+  # Tools, not started by `up`.
+  send:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.7.0}
+    entrypoint: ["hl7-edge-gateway", "send"]
+    volumes: ["./messages:/messages:ro"]
+    profiles: ["tools"]
+  tool:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.7.0}
+    entrypoint: ["hl7-edge-gateway"]
+    env_file: .env
+    working_dir: /sample
+    volumes: [".:/sample:ro", "./messages:/messages:ro"]
+    profiles: ["tools"]
+
+volumes:
+  queue:
