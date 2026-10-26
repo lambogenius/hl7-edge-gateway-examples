@@ -26,6 +26,7 @@ Step-by-step guides with screenshots: <https://docs.lambogenius.com/hl7-edge-gat
 | [12 · Results to the EHR, alerts by order](12-results-to-ehr-and-alerts) | Pass-through: a LIS waits for the EHR's own ACK; what the EHR accepted is copied to an on-call pager (critical values) and infection control (positive cultures), picked by segment-group filters | Docker (gateway 0.5.0 or later) |
 | [13 · One ADT feed, three shapes](13-one-message-three-shapes) | Transforms per destination: HL7 with the lab system's codes (rules and a CSV code table), JSON for a patient portal (a Liquid template), and de-identified HL7 for research (hashing); a code the table lacks waits in one dead-letter queue until it is added | Docker (gateway 0.6.0 or later) |
 | [14 · MEDITECH to FHIR](14-meditech-to-fhir) | ADT, orders, results and immunizations into a FHIR R4 server (HAPI FHIR here), one transaction per message: one Patient however many messages name it, results corrected in place, MEDITECH's own codes added in one small file | Docker (gateway 0.7.0 or later) |
+| [15 · Claims, remittances and eligibility](15-claims-remits-eligibility) | X12: 837 claims from billing checked and answered with 999 and TA1 files, sent to the clearinghouse in the clinic's own envelope; 835 remittances to a revenue API as JSON and 277CAs back to billing; real-time 270/271 eligibility with a payer's CAQH CORE server | Docker (gateway 0.8.0 or later) |
 
 Samples 07–09 share one Kubernetes base, [`shared/kubernetes`](shared/kubernetes), which is tested on k3s.
 

@@ -1,0 +1,20 @@
+flowchart TD
+  A["An X12 interchange<br/>(a file, or an HTTP body)"]:::ext --> B{"Envelope sound?<br/>ISA, control numbers, counts"}
+  B -- no --> TA1["TA1 rejecting it (R)"]:::bad
+  B -- yes --> L{"License allows ISA-15?<br/>(T free, P paid)"}
+  L -- no --> TA1
+  L -- yes --> C["Each transaction set checked:<br/>loops, segment order and repeats,<br/>required segments and elements,<br/>types, lengths, code lists"]:::gw
+  C --> ACK["999: AK2/IK5 per set (A, E or R),<br/>IK3/IK4 where it is wrong;<br/>TA1 if ISA-14 = 1"]:::gw
+  ACK --> S{"Any set accepted?"}
+  S -- no --> ERR["Nothing goes on;<br/>the file to error_directory"]:::bad
+  S -- yes --> Q["Accepted sets stored<br/>(store and forward)"]:::store
+  Q --> D["Each destination: filter,<br/>transform (x12 = json),<br/>envelope (own ISA/GS, new control numbers)"]:::gw
+  D --> OK["SFTP file, HTTP POST,<br/>or a CAQH CORE request"]:::ok
+  D -- "destination down" --> RETRY["Retry with backoff"]:::store
+  RETRY --> D
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  classDef bad fill:#fdecec,stroke:#dc2626,color:#0f172a
+  classDef ok fill:#ecfdf3,stroke:#16a34a,color:#0f172a

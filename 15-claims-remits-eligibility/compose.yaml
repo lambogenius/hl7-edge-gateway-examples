@@ -1,0 +1,69 @@
+# Sample 15: claims to the clearinghouse, remittances back, and real-time eligibility, all in X12.
+#   docker compose up -d                  keys, the SFTP server, the gateway, a revenue API and a payer's CORE server
+#   docker compose run --rm tool …        gateway commands, such as x12, on the files in files/
+name: hl7edge-sample-15
+
+services:
+  gateway:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.8.0}
+    env_file: .env
+    ports:
+      - "8081:8081"   # eligibility requests from registration (HTTP)
+      - "8080:8080"   # admin console
+    volumes:
+      - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
+      - keys:/keys:ro
+      - queue:/var/lib/hl7-edge-gateway
+    depends_on:
+      sftp: { condition: service_started }
+      revenue: { condition: service_started }
+      payer: { condition: service_started }
+
+  # The SFTP server, standing in for two: the hospital's file server, where the billing system's account
+  # "billing" has outbox (claims, with done, acks and errors) and inbox (claim acknowledgments), and the
+  # clearinghouse's, where the hospital's account "northside" has inbound (claims) and reports (remittances
+  # and acknowledgments, with processed). SFTP_PASSWORD signs you in to either, on localhost:2222.
+  sftp:
+    image: atmoz/sftp:alpine
+    command:
+      - "billing:${SFTP_PASSWORD}:1001:100:outbox,outbox/done,outbox/acks,outbox/errors,inbox"
+      - "northside:${SFTP_PASSWORD}:1002:100:inbound,reports,reports/processed"
+    ports: ["2222:22"]
+    volumes:
+      - keys:/keys:ro
+      - ./sftp/install-keys.sh:/etc/sftp.d/install-keys.sh:ro
+    depends_on:
+      keys: { condition: service_completed_successfully }
+
+  # Makes the SFTP server's host keys, the gateway's key and its known_hosts, once.
+  keys:
+    image: alpine:3.20
+    command: ["sh", "/scripts/make-keys.sh"]
+    volumes:
+      - keys:/keys
+      - ./sftp:/scripts:ro
+
+  # Stand-in for the hospital's revenue-cycle API: takes remittances as JSON.
+  revenue:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/revenue_api.py"]
+    volumes: ["./revenue:/app:ro"]
+
+  # Stand-in for the health plan's CAQH CORE server: answers 270s with 271s.
+  payer:
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/core_payer.py"]
+    volumes: ["./payer:/app:ro"]
+
+  # Tools, not started by `up`.
+  tool:
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.8.0}
+    entrypoint: ["hl7-edge-gateway"]
+    env_file: .env
+    working_dir: /sample
+    volumes: [".:/sample:ro", "./files:/files:ro"]
+    profiles: ["tools"]
+
+volumes:
+  keys:
+  queue:

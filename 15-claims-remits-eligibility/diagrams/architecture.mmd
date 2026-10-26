@@ -1,0 +1,33 @@
+flowchart LR
+  subgraph H["Hospital network"]
+    B["Billing system"]:::ext
+    REG["Registration"]:::ext
+    REV["Revenue-cycle API"]:::ext
+    FS[("File server (SFTP)<br/>billing: outbox, inbox")]:::store
+    subgraph G["HL7 Edge Gateway"]
+      C["claims-to-clearinghouse<br/>check, 999/TA1,<br/>own envelope"]:::gw
+      R["reports-to-billing<br/>one set at a time:<br/>835 → JSON, 277CA → file"]:::gw
+      E["eligibility<br/>pass-through"]:::gw
+    end
+  end
+  subgraph CH["Clearinghouse"]
+    CS[("SFTP<br/>northside: inbound, reports")]:::store
+  end
+  subgraph P["Health plan"]
+    CORE["CAQH CORE server<br/>(C4.0.0)"]:::ext
+  end
+  B -- "837 files" --> FS
+  FS -- "outbox/*.x12" --> C
+  C -. "outbox/acks: 999, TA1" .-> FS
+  C -- "837, envelope NORTHSIDE" --> CS
+  CS -- "reports: 835, 277CA" --> R
+  R -- "835 as JSON (HTTPS)" --> REV
+  R -- "277CA to inbox" --> FS
+  REG -- "270 over HTTPS<br/>X-API-Key" --> E
+  E -- "SOAP 1.2 + MTOM<br/>RealTimeTransaction" --> CORE
+  CORE -. "271" .-> E
+  E -. "271" .-> REG
+
+  classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
+  classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
+  classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
