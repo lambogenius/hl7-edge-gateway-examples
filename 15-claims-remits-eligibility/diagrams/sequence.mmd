@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant B as Billing (SFTP outbox)
+  participant G as Gateway
+  participant C as Clearinghouse (SFTP)
+  participant V as Revenue API
+  participant R as Registration
+  participant P as Payer CORE server
+  B->>G: 1-claims.x12 (two 837P interchanges), 2-claim-missing-subscriber.x12
+  G-->>B: outbox/acks: TA1 A + 999 A, twice, then TA1 A + 999 R (IK3 NM1 2010BA)
+  G-->>B: outbox/errors: the rejected interchange and why
+  G->>C: inbound/claims_NSBILLING_000000101.x12, …102.x12 (ISA ZZ*NORTHSIDE, control numbers 1, 3)
+  C->>G: reports/3-remittance-835.x12, 4-claim-acknowledgment-277ca.x12
+  G->>V: POST /remits: the 835 as JSON (PAT1001 paid 120, PAT1002 paid 72)
+  G->>B: inbox/ the 277CA
+  R->>G: POST /eligibility: 270 for Ana Rivera
+  G->>P: COREEnvelopeRealTimeRequest, X12_270_Request_005010X279A1, 270 as MTOM attachment
+  P-->>G: ErrorCode Success, 271 attached (EB*1 GOLD PLAN)
+  G-->>R: 200, the 271
+  R->>G: POST /eligibility: 270 for a non-member
+  G->>P: the same, for W999000111
+  P-->>G: Success, 271 with AAA*Y**75 (subscriber not found)
+  G-->>R: 200, the 271

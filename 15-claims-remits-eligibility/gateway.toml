@@ -1,0 +1,116 @@
+# Sample 15: claims, remittances and eligibility in X12 (HL7 Edge Gateway 0.8+).
+#
+#   claims-to-clearinghouse  The billing system drops 837 claim files in its SFTP folder outbox. The gateway checks
+#                            each interchange, writes its 999 (and TA1) to outbox/acks for billing, and sends each
+#                            accepted claim to the clearinghouse's folder inbound, in the gateway's own envelope.
+#                            A rejected interchange goes to outbox/errors with the reason.
+#   reports-to-billing       The clearinghouse drops remittances (835) and claim acknowledgments (277CA) in reports.
+#                            Each transaction set goes on its own: 835s to the revenue API as JSON, 277CAs to the
+#                            billing system's folder inbox.
+#   eligibility              Registration posts a 270 over HTTP and gets the payer's 271 back, through the payer's
+#                            CAQH CORE server (connectivity rule C4.0.0), in real time.
+#
+# One SFTP server stands in for both the hospital's file server (account billing) and the clearinghouse's
+# (account northside). The gateway signs in with the key the keys container makes. Secrets come from .env.
+
+node_id = "gateway-1"
+
+[admin]
+listen = "0.0.0.0:8080"
+token = "${HL7EDGE_ADMIN_TOKEN}"
+allow_payload_view = true            # the console's message viewer, with X12 one segment per line
+
+[store]
+backend = "embedded"
+path = "/var/lib/hl7-edge-gateway"
+
+[[route]]
+name = "claims-to-clearinghouse"
+mode = "store_and_forward"           # billing gets its 999 once a claim is stored; the clearinghouse can be down
+format = "x12"
+x12 = { ta1 = "requested" }          # a TA1 when ISA-14 = 1 asks for one, as billing's files do
+store_and_forward = { on_reject = "dead_letter", retry = { initial = "2s", max = "30s" } }
+
+[route.source]
+type = "sftp"
+host = "sftp"
+username = "billing"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"
+directory = "outbox"
+pattern = "*.x12"                    # one interchange per file, or several back to back
+poll_interval = "3s"
+after = "move:outbox/done"
+ack_directory = "outbox/acks"        # <file>.ack.x12: a TA1 and a 999 for each interchange
+error_directory = "outbox/errors"    # rejected interchanges, and <file>.txt with the reasons
+
+[[route.destinations]]
+name = "clearinghouse"
+type = "sftp"
+host = "sftp"
+username = "northside"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"
+directory = "inbound"
+file_name = "claims_{control_id}.x12"
+# The clearinghouse knows the hospital as NORTHSIDE, not as the billing system's own ID.
+envelope = { sender = "ZZ:NORTHSIDE", receiver = "ZZ:ACMECLEAR" }
+
+[[route]]
+name = "reports-to-billing"
+mode = "store_and_forward"
+format = "x12"
+x12 = { split = "transaction" }      # each transaction set on its own, so the filters pick 835s and 277CAs
+store_and_forward = { on_reject = "dead_letter", retry = { initial = "2s", max = "30s" } }
+
+[route.source]
+type = "sftp"
+host = "sftp"
+username = "northside"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"
+directory = "reports"
+pattern = "*.x12"
+poll_interval = "3s"
+after = "move:reports/processed"
+
+[[route.destinations]]
+name = "revenue-api"
+type = "http"
+url = "http://revenue:8000/remits"
+filter = { transaction_set = ["835"] }
+transform = { step = [ { x12 = "json" } ] }   # the remittance as JSON, by its loops
+
+[[route.destinations]]
+name = "billing-inbox"
+type = "sftp"
+host = "sftp"
+username = "billing"
+private_key = "/keys/gateway_ed25519"
+known_hosts = "/keys/known_hosts"
+directory = "inbox"
+filter = { transaction_set = ["277CA"] }
+
+[[route]]
+name = "eligibility"
+mode = "passthrough"                 # registration waits for the payer's answer
+format = "x12"
+request_timeout = "20s"
+passthrough = { ack_from = "response_body" }  # answer with the payer's 271 as it came
+
+[route.source]
+type = "http"
+listen = "0.0.0.0:8081"
+path = "/eligibility"
+auth = { type = "api_key", keys = { registration = "${REGISTRATION_API_KEY}" } }
+
+[[route.destinations]]
+name = "acme-health-plan"
+type = "caqh_core"
+url = "http://payer:8000/core"
+sender_id = "NORTHSIDE"              # SenderID and ReceiverID, as the payer's connectivity guide gives them
+receiver_id = "ACME1"
+# A real payer's CORE server takes HTTPS with a client certificate, and often an OAuth 2.0 token:
+# url = "https://core.acmehealth.example/CORE/RealTime"
+# tls = { client_cert = "/etc/hl7-edge-gateway/core-client.crt", client_key = "/etc/hl7-edge-gateway/core-client.key" }
+# auth = { type = "oauth2", token_url = "https://login.acmehealth.example/oauth2/token", client_id = "northside", client_secret = "${ACME_CORE_SECRET}" }
