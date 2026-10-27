@@ -1,4 +1,4 @@
-# Sample 15: claims, remittances and eligibility in X12 (HL7 Edge Gateway 0.8+).
+# Sample 15: claims, remittances and eligibility in X12 (HL7 Edge Gateway 0.9+).
 #
 #   claims-to-clearinghouse  The billing system drops 837 claim files in its SFTP folder outbox. The gateway checks
 #                            each interchange, writes its 999 (and TA1) to outbox/acks for billing, and sends each
@@ -9,20 +9,53 @@
 #                            billing system's folder inbox.
 #   eligibility              Registration posts a 270 over HTTP and gets the payer's 271 back, through the payer's
 #                            CAQH CORE server (connectivity rule C4.0.0), in real time.
+#   remits-from-payer        The gateway asks the payer's CORE server for remittances (835) waiting there, sends each
+#                            to the revenue API as JSON, and sends the payer its 999 for each, as CORE asks.
 #
 # One SFTP server stands in for both the hospital's file server (account billing) and the clearinghouse's
 # (account northside). The gateway signs in with the key the keys container makes. Secrets come from .env.
+#
+# The data is PHI, so: stored messages are encrypted (HL7EDGE_STORE_KEY), the console is HTTPS with a sign-in for
+# billing-ops (an operator, who can't see message contents), and everything done in it is in the audit trail.
 
 node_id = "gateway-1"
 
 [admin]
 listen = "0.0.0.0:8080"
-token = "${HL7EDGE_ADMIN_TOKEN}"
-allow_payload_view = true            # the console's message viewer, with X12 one segment per line
+# The keys container makes a self-signed certificate for localhost, so the browser warns once. In production, use
+# your own certificate, or end TLS at a load balancer and set behind_tls_proxy = true.
+tls = { cert = "/keys/console.crt", key = "/keys/console.key" }
+token = "${HL7EDGE_ADMIN_TOKEN}"     # an admin API token, for demo.sh and scripts
+allow_payload_view = true            # the message viewer, for those with view_payload (the admin token has it)
+
+# The billing office's operator signs in to the console with a password: pause, retry and requeue, but no message
+# contents. Make the hash with `hl7-edge-gateway hash-password` (see .env.example).
+[[admin.users]]
+name = "billing-ops"
+password_hash = "${BILLING_OPS_PASSWORD_HASH}"
+role = "operator"
+view_payload = false
+
+# Single sign-on instead, with Entra ID or another OpenID Connect provider:
+# [admin.oidc]
+# issuer = "https://login.microsoftonline.com/<tenant id>/v2.0"
+# client_id = "<application id>"
+# client_secret = "${OIDC_CLIENT_SECRET}"
+# public_url = "https://localhost:8080"
+# role_map = { "Billing.Operator" = "operator", "Billing.Auditor" = "auditor", "Billing.Admin" = "admin" }
+
+[admin.session]
+idle_timeout = "15m"                 # automatic logoff
+
+[audit]
+retention = "6y"                     # sign-ins, changes, message views; GET /api/audit, or the console's Audit card
 
 [store]
 backend = "embedded"
 path = "/var/lib/hl7-edge-gateway"
+# Claims and remittances are encrypted (AES-256-GCM) before they're written. Make the key with
+# `hl7-edge-gateway generate-key`; keep it somewhere other than the queue volume.
+encryption = { keys = [{ id = "sample-15", env = "HL7EDGE_STORE_KEY" }] }
 
 [[route]]
 name = "claims-to-clearinghouse"
@@ -114,3 +147,23 @@ receiver_id = "ACME1"
 # url = "https://core.acmehealth.example/CORE/RealTime"
 # tls = { client_cert = "/etc/hl7-edge-gateway/core-client.crt", client_key = "/etc/hl7-edge-gateway/core-client.key" }
 # auth = { type = "oauth2", token_url = "https://login.acmehealth.example/oauth2/token", client_id = "northside", client_secret = "${ACME_CORE_SECRET}" }
+
+[[route]]
+name = "remits-from-payer"
+mode = "store_and_forward"           # each remittance is stored before the payer gets its 999
+format = "x12"
+store_and_forward = { on_reject = "dead_letter", retry = { initial = "2s", max = "30s" } }
+
+[route.source]
+type = "caqh_core"
+url = "http://payer:8000/core"
+sender_id = "NORTHSIDE"
+receiver_id = "ACME1"
+retrieve = ["X12_835_Request_005010X221A1"]   # the PayloadTypes the payer's connectivity guide lists
+poll_interval = "10s"                # every few minutes or hours with a real payer
+
+[[route.destinations]]
+name = "revenue-api"
+type = "http"
+url = "http://revenue:8000/remits"
+transform = { step = [ { x12 = "json" } ] }

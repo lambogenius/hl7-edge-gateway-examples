@@ -5,11 +5,11 @@ name: hl7edge-sample-15
 
 services:
   gateway:
-    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.8.0}
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.9.0}
     env_file: .env
     ports:
       - "8081:8081"   # eligibility requests from registration (HTTP)
-      - "8080:8080"   # admin console
+      - "8080:8080"   # admin console, https://localhost:8080
     volumes:
       - ./gateway.toml:/etc/hl7-edge-gateway/hl7-edge-gateway.toml:ro
       - keys:/keys:ro
@@ -49,7 +49,8 @@ services:
     command: ["python", "-u", "/app/revenue_api.py"]
     volumes: ["./revenue:/app:ro"]
 
-  # Stand-in for the health plan's CAQH CORE server: answers 270s with 271s.
+  # Stand-in for the health plan's CAQH CORE server: answers 270s with 271s, and hands out the remittances in
+  # payer/remits.
   payer:
     image: python:3.12-slim
     command: ["python", "-u", "/app/core_payer.py"]
@@ -57,7 +58,7 @@ services:
 
   # Tools, not started by `up`.
   tool:
-    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.8.0}
+    image: lambogenius/hl7-edge-gateway:${GATEWAY_VERSION:-0.9.0}
     entrypoint: ["hl7-edge-gateway"]
     env_file: .env
     working_dir: /sample

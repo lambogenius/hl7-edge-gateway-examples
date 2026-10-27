@@ -1,18 +1,26 @@
 """Stand-in for a health plan's CAQH CORE server (connectivity rule C4.0.0), for sample 15.
 
-Takes a real-time eligibility request: a SOAP 1.2 COREEnvelopeRealTimeRequest with the 270 as an MTOM
-attachment. It answers with a COREEnvelopeRealTimeResponse whose attachment is a 271 made from the 270: the
-plan's members (below) are covered, anyone else is "subscriber not found" (AAA*Y**75). A request whose
-envelope is wrong gets the ErrorCode a CORE server would give (PayloadTypeIllegal, VersionMismatch, ...).
-Every request is printed as "payer: <ErrorCode> <subscriber> <answer>".
+Real time: takes an eligibility request, a SOAP 1.2 COREEnvelopeRealTimeRequest with the 270 as an MTOM
+attachment, and answers with a COREEnvelopeRealTimeResponse whose attachment is a 271 made from the 270: the
+plan's members (below) are covered, anyone else is "subscriber not found" (AAA*Y**75). Printed as
+"payer: <ErrorCode> <subscriber> <answer>".
 
-A real payer also wants a client certificate and, often, an OAuth 2.0 token; this one listens on plain HTTP.
+Batch results: remittances (835s) waiting in remits/ are handed out one at a time to a
+COREEnvelopeBatchResultsRetrievalRequest for X12_835_Request_005010X221A1, each once; when none is left the answer
+is X12_005010_Response_NoBatchResultsFile. The 999 the gateway sends back for each one
+(COREEnvelopeBatchResultsAckSubmission) is printed with its AK9.
+
+A request whose envelope is wrong gets the ErrorCode a CORE server would give (PayloadTypeIllegal,
+VersionMismatch, ...). A real payer also wants a client certificate and, often, an OAuth 2.0 token; this one
+listens on plain HTTP.
 """
 import email.parser
 import email.policy
 import http.server
 import itertools
+import os
 import re
+import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET
@@ -21,6 +29,25 @@ SOAP12 = "http://www.w3.org/2003/05/soap-envelope"
 CORE = "http://www.caqh.org/SOAP/WSDL/CORERuleC4.0.0.xsd"
 MEMBERS = {"W100200300": ("GOLD PLAN", "20260101", 500, 25)}  # member ID: plan, coverage start, deductible, copay
 NUMBERS = itertools.count(7001)  # the payer's interchange control numbers
+REMITS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "remits")
+handed_out = set()  # remittance files already retrieved
+lock = threading.Lock()
+# The SOAP action and request element of each kind of request, and the element of its answer.
+OPERATIONS = {
+    "RealTimeTransaction": ("COREEnvelopeRealTimeRequest", "COREEnvelopeRealTimeResponse"),
+    "BatchResultsRetrievalTransaction": ("COREEnvelopeBatchResultsRetrievalRequest", "COREEnvelopeBatchResultsRetrievalResponse"),
+    "BatchResultsAckSubmitTransaction": ("COREEnvelopeBatchResultsAckSubmission", "COREEnvelopeBatchResultsAckSubmissionResponse"),
+}
+
+
+def next_remit():
+    """The oldest remittance not handed out yet, as (file name, bytes), or None."""
+    with lock:
+        names = sorted(n for n in os.listdir(REMITS) if n.endswith(".x12") and n not in handed_out) if os.path.isdir(REMITS) else []
+        if not names:
+            return None
+        handed_out.add(names[0])
+    return names[0], open(os.path.join(REMITS, names[0]), "rb").read()
 
 
 def parts(content_type, body):
@@ -83,11 +110,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     payload = next((data for cid, data in found[1:] if cid == href), None)
                 else:
                     fields[name] = child.text or ""
-            if req.tag != f"{{{CORE}}}COREEnvelopeRealTimeRequest" or fields.get("CORERuleVersion") != "C4.0.0":
+            action = (re.search(r'action="(\w+)"', ct) or [None, ""])[1]
+            op = next((a for a, (element, _) in OPERATIONS.items() if req.tag == f"{{{CORE}}}{element}"), None)
+            mode = "RealTime" if op == "RealTimeTransaction" else "Batch"
+            if op is None or fields.get("CORERuleVersion") != "C4.0.0":
                 code = "VersionMismatch"
-            elif 'action="RealTimeTransaction"' not in ct or fields.get("ProcessingMode") != "RealTime":
+            elif action != op or fields.get("ProcessingMode") != mode:
                 code = "ProcessingModeIllegal"
-            elif fields.get("PayloadType") != "X12_270_Request_005010X279A1":
+            elif op == "RealTimeTransaction":
+                if fields.get("PayloadType") != "X12_270_Request_005010X279A1":
+                    code = "PayloadTypeIllegal"
+                elif not payload or not payload.startswith(b"ISA"):
+                    code = "PayloadRequired"
+            elif op == "BatchResultsRetrievalTransaction":
+                if fields.get("PayloadType") != "X12_835_Request_005010X221A1":
+                    code = "PayloadTypeIllegal"  # this payer only has remittances to hand out
+            elif not re.fullmatch(r"X12_(999|TA1)_SubmissionRequest_\w+", fields.get("PayloadType", "")):
                 code = "PayloadTypeIllegal"
             elif not payload or not payload.startswith(b"ISA"):
                 code = "PayloadRequired"
@@ -96,19 +134,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 f'<env:Envelope xmlns:env="{SOAP12}"><env:Body><env:Fault><env:Code><env:Value>env:Sender</env:Value>'
                 f'</env:Code><env:Reason><env:Text xml:lang="en">not a CORE request: {e}</env:Text></env:Reason>'
                 "</env:Fault></env:Body></env:Envelope>").encode())
-        answer, member, result = (answer_271(payload) if code == "Success" else (None, "-", "-"))
-        print(f"payer: {code} {member} {result}", flush=True)
+        answer, answer_type = None, "CoreEnvelopeError" if mode == "RealTime" else "X12_BatchReceiptConfirmation"
+        if code == "Success" and op == "RealTimeTransaction":
+            answer, member, result = answer_271(payload)
+            answer_type = "X12_271_Response_005010X279A1"
+            print(f"payer: {code} {member} {result}", flush=True)
+        elif code == "Success" and op == "BatchResultsRetrievalTransaction":
+            remit = next_remit()
+            if remit:
+                answer, answer_type = remit[1], "X12_835_Response_005010X221A1"
+                print(f"payer: remittance {remit[0]} handed out", flush=True)
+            else:
+                answer_type = "X12_005010_Response_NoBatchResultsFile"
+        elif code == "Success":
+            ak9 = re.search(rb"AK9\*[^~]*", payload)
+            print(f"payer: 999 received for a remittance: {ak9.group().decode() if ak9 else '?'}", flush=True)
+            answer_type = "X12_Response_ConfirmReceiptReceived"
+        else:
+            print(f"payer: {code} -", flush=True)
         meta = "".join(f"<{k}>{v}</{k}>" for k, v in [
-            ("PayloadType", "X12_271_Response_005010X279A1" if answer else "CoreEnvelopeError"),
-            ("ProcessingMode", "RealTime"), ("PayloadID", fields.get("PayloadID", "")),
+            ("PayloadType", answer_type), ("ProcessingMode", mode), ("PayloadID", fields.get("PayloadID", "")),
             ("TimeStamp", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
             ("SenderID", fields.get("ReceiverID", "")), ("ReceiverID", fields.get("SenderID", "")),
             ("CORERuleVersion", "C4.0.0")])
         include = '<Payload><xop:Include xmlns:xop="http://www.w3.org/2004/08/xop/include" href="cid:payload"/></Payload>' if answer else ""
         message = "" if code == "Success" else f"refused: {code}"
-        xml = (f'<soapenv:Envelope xmlns:soapenv="{SOAP12}"><soapenv:Body><ns1:COREEnvelopeRealTimeResponse xmlns:ns1="{CORE}">'
+        element = OPERATIONS[op][1] if op else "COREEnvelopeRealTimeResponse"
+        xml = (f'<soapenv:Envelope xmlns:soapenv="{SOAP12}"><soapenv:Body><ns1:{element} xmlns:ns1="{CORE}">'
                f"{meta}{include}<ErrorCode>{code}</ErrorCode><ErrorMessage>{message}</ErrorMessage>"
-               "</ns1:COREEnvelopeRealTimeResponse></soapenv:Body></soapenv:Envelope>").encode()
+               f"</ns1:{element}></soapenv:Body></soapenv:Envelope>").encode()
         boundary = "uuid:" + str(uuid.uuid4())
         out = (f'--{boundary}\r\nContent-Type: application/xop+xml; charset=UTF-8; type="application/soap+xml"\r\n'
                "Content-ID: <root>\r\n\r\n").encode() + xml + b"\r\n"
