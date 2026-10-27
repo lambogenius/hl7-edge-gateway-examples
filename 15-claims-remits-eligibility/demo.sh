@@ -7,6 +7,9 @@ step() { printf '\n== %s\n' "$*"; }
 fail() { echo "FAILED: $*" >&2; exit 1; }
 [ -f .env ] || fail "copy .env.example to .env and put your license in it"
 . ./.env
+[ -n "${HL7EDGE_STORE_KEY:-}" ] || fail "put a store key in .env (HL7EDGE_STORE_KEY; see .env.example)"
+case "${BILLING_OPS_PASSWORD_HASH:-}" in '$argon2id$'*) ;; *) fail "put billing-ops's password hash in .env (see .env.example)" ;; esac
+console=https://localhost:8080   # a self-signed certificate, hence curl -k
 tool() { docker compose --progress quiet run --rm -T tool "$@"; }
 # drop ACCOUNT FOLDER FILE: a file from files/ into an SFTP folder, written under a temporary name and then
 # renamed, as SFTP uploads are.
@@ -19,19 +22,23 @@ has_file() { docker compose exec -T sftp test -f "/home/$1"; }
 files_in() { on_sftp "ls -1 /home/$1 2>/dev/null | grep -c '\\.x12\$'" || true; }
 count_is() { [ "$(files_in "$1")" = "$2" ]; }
 revenue() { docker compose logs revenue | grep "revenue: EFT" | sed 's/^.*| //' || true; }
-remits_are() { [ "$(revenue | wc -l | tr -d ' ')" = "$1" ]; }
+remits_are() { [ "$(revenue | grep -c "$1")" = "$2" ]; }   # remits_are TRACE COUNT
 ask() {
   curl -s -H "X-API-Key: $REGISTRATION_API_KEY" -H "Content-Type: application/edi-x12" --data-binary "@files/$1" \
     -w '\nHTTP %{http_code}\n' http://localhost:8081/eligibility
 }
-api() { curl -s -H "Authorization: Bearer $HL7EDGE_ADMIN_TOKEN" "http://localhost:8080/api/$1"; }
-ready() { curl -sf http://localhost:8080/ready >/dev/null; }
+api() { curl -sk -H "Authorization: Bearer $HL7EDGE_ADMIN_TOKEN" "$console/api/$1"; }
+ready() { curl -skf "$console/ready" >/dev/null; }
+status() { curl -sk -w '
+%{http_code}' "$@" | tail -n 1; }   # the HTTP status only
+payer_has_ack() { docker compose logs payer | grep -q "payer: 999 received"; }
 wait_until() { n=$1; shift; while [ "$n" -gt 0 ]; do "$@" && return 0; sleep 1; n=$((n - 1)); done; return 1; }
 
 step "Starting the SFTP server, the gateway, a revenue API and the payer's CORE server"
 docker compose --progress quiet up -d
 wait_until 60 ready || fail "the gateway is not ready; see: docker compose logs gateway"
-echo "Three X12 routes: claims-to-clearinghouse, reports-to-billing and eligibility."
+echo "Four X12 routes: claims-to-clearinghouse, reports-to-billing, eligibility and remits-from-payer."
+docker compose logs gateway | grep -o 'stored messages are encrypted[^"]*' | head -1 || fail "stored messages should be encrypted"
 
 step "0. Check the claim files first, as billing would"
 tool x12 /files/1-claims.x12 || fail "the claims should be accepted"
@@ -67,12 +74,12 @@ echo "The billing system's own ISA/GS (NSBILLING) became the hospital's (NORTHSI
 step "3. The clearinghouse drops a remittance (835) and a claim acknowledgment (277CA)"
 drop northside reports 3-remittance-835.x12
 drop northside reports 4-claim-acknowledgment-277ca.x12
-wait_until 30 remits_are 2 || fail "the revenue API should get both claims of the remittance"
+wait_until 30 remits_are EFT20261030 2 || fail "the revenue API should get both claims of the remittance"
 revenue
 [ "$(revenue | grep -c 'PAT1001 billed 150 paid 120 patient owes 30')" = 1 ] || fail "PAT1001: paid 120, patient owes 30"
 wait_until 30 count_is billing/inbox 1 || fail "the 277CA should go to billing's inbox"
 echo "billing/inbox: $(on_sftp 'ls -1 /home/billing/inbox')"
-curl -s http://localhost:8080/metrics -H "Authorization: Bearer $HL7EDGE_ADMIN_TOKEN" | grep '^hl7edge_x12_acks_total' || true
+curl -sk "$console/metrics" | grep '^hl7edge_x12_acks_total' || true
 
 step "4. Registration asks the payer about two patients (270), in real time over CAQH CORE"
 out=$(ask 5-eligibility-270.x12)
@@ -86,12 +93,42 @@ docker compose logs payer | grep "payer: Success" | sed 's/^.*| //'
 status=$(curl -s -o /dev/null -w '%{http_code}' --data-binary @files/5-eligibility-270.x12 http://localhost:8081/eligibility || true)
 [ "$status" = 401 ] || fail "a request without the API key should get 401, got $status"
 echo "Without X-API-Key: HTTP 401"
-curl -s http://localhost:8080/metrics | grep '^hl7edge_core_requests_total' || fail "the CORE requests should be counted"
+curl -sk "$console/metrics" | grep '^hl7edge_core_requests_total' || fail "the CORE requests should be counted"
 
 step "5. See the remittance as JSON, as the revenue API got it"
 tool x12 --json /files/3-remittance-835.x12 | sed -n '/^{/,$p' | head -40
 echo "…"
 
+step "6. The payer's own remittance, picked up from its CORE server"
+wait_until 30 remits_are EFT20261106 1 || fail "the revenue API should get the payer's remittance (PAT1003)"
+revenue | grep EFT20261106
+docker compose logs payer | grep "payer: remittance" | sed 's/^.*| //'
+wait_until 30 payer_has_ack || fail "the payer should get the gateway's 999"
+docker compose logs payer | grep "payer: 999 received" | sed 's/^.*| //'
+curl -sk "$console/metrics" | grep '^hl7edge_core_retrievals_total' || fail "the retrievals should be counted"
+
+step "7. The console: billing-ops signs in, and everything is in the audit trail"
+if [ -n "${BILLING_OPS_PASSWORD:-}" ]; then
+  login=$(printf '{"name":"billing-ops","password":"%s"}' "$BILLING_OPS_PASSWORD")
+  cookie=$(curl -sk -D - -H 'X-Requested-With: demo' -H 'Content-Type: application/json' --data "$login" \
+    "$console/auth/login" | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \(hl7edge_session=[^;]*\).*/\1/p')
+  [ -n "$cookie" ] || fail "billing-ops should sign in with BILLING_OPS_PASSWORD"
+  curl -sk -H "Cookie: $cookie" "$console/auth/me" | grep -o '"role":"operator"' || fail "billing-ops is an operator"
+  code=$(status -X POST -H "Cookie: $cookie" -H 'X-Requested-With: demo' "$console/api/routes/claims-to-clearinghouse/pause")
+  [ "$code" = 204 ] || fail "an operator pauses a route, got $code"
+  curl -sk -X POST -H "Cookie: $cookie" -H 'X-Requested-With: demo' "$console/api/routes/claims-to-clearinghouse/resume" >/dev/null
+  echo "billing-ops paused and resumed claims-to-clearinghouse"
+  code=$(status -H "Cookie: $cookie" "$console/api/audit")
+  [ "$code" = 403 ] || fail "an operator may not read the audit trail, got $code"
+  echo "billing-ops may not read the audit trail: HTTP 403"
+  curl -sk -X POST -H "Cookie: $cookie" -H 'X-Requested-With: demo' "$console/auth/logout" >/dev/null
+else
+  echo "(BILLING_OPS_PASSWORD isn't set in .env: skipping the sign-in)"
+fi
+echo "The audit trail, newest first:"
+curl -sk -H "Authorization: Bearer $HL7EDGE_ADMIN_TOKEN" "$console/api/audit.csv?limit=8" | tr -d '' | cut -d, -f2,4,8,9,11 | column -t -s, 2>/dev/null || true
+
 echo
-echo "Done. Claims checked and acknowledged for billing, sent on in the hospital's envelope; the remittance as JSON"
-echo "for the revenue API and the 277CA for billing; eligibility from the payer in real time. Console: http://localhost:8080."
+echo "Done. Claims checked and acknowledged for billing, sent on in the hospital's envelope; the remittances as JSON"
+echo "for the revenue API, from the clearinghouse and from the payer's CORE server; the 277CA for billing; eligibility"
+echo "from the payer in real time. Stored messages are encrypted. Console: https://localhost:8080 (sign in as billing-ops)."

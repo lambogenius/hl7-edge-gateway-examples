@@ -20,3 +20,9 @@ sequenceDiagram
   G->>P: the same, for W999000111
   P-->>G: Success, 271 with AAA*Y**75 (subscriber not found)
   G-->>R: 200, the 271
+  G->>P: every 10s: COREEnvelopeBatchResultsRetrievalRequest, X12_835_Request_005010X221A1
+  P-->>G: Success, the 835 waiting (EFT20261106) as MTOM attachment
+  G->>P: COREEnvelopeBatchResultsAckSubmission: the gateway's 999 (AK9*A)
+  G->>V: POST /remits: the 835 as JSON (PAT1003 paid 160)
+  G->>P: the next poll
+  P-->>G: X12_005010_Response_NoBatchResultsFile

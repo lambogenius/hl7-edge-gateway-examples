@@ -8,6 +8,8 @@ flowchart LR
       C["claims-to-clearinghouse<br/>check, 999/TA1,<br/>own envelope"]:::gw
       R["reports-to-billing<br/>one set at a time:<br/>835 → JSON, 277CA → file"]:::gw
       E["eligibility<br/>pass-through"]:::gw
+      RP["remits-from-payer<br/>CORE batch results"]:::gw
+      CON["Console (HTTPS)<br/>billing-ops signs in;<br/>roles, audit trail;<br/>queue encrypted at rest"]:::gw
     end
   end
   subgraph CH["Clearinghouse"]
@@ -27,6 +29,9 @@ flowchart LR
   E -- "SOAP 1.2 + MTOM<br/>RealTimeTransaction" --> CORE
   CORE -. "271" .-> E
   E -. "271" .-> REG
+  RP -- "BatchResultsRetrieval<br/>then the 999" --> CORE
+  CORE -. "835" .-> RP
+  RP -- "835 as JSON" --> REV
 
   classDef gw fill:#e8f1fb,stroke:#2563eb,color:#0f172a
   classDef store fill:#fff7e6,stroke:#d97706,color:#0f172a
