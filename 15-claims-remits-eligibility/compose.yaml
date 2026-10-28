@@ -15,7 +15,7 @@ services:
       - keys:/keys:ro
       - queue:/var/lib/hl7-edge-gateway
     depends_on:
-      sftp: { condition: service_started }
+      sftp: { condition: service_healthy }   # sshd is listening, so the first poll doesn't fail
       revenue: { condition: service_started }
       payer: { condition: service_started }
 
@@ -32,6 +32,10 @@ services:
     volumes:
       - keys:/keys:ro
       - ./sftp/install-keys.sh:/etc/sftp.d/install-keys.sh:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "22"]
+      interval: 2s
+      retries: 15
     depends_on:
       keys: { condition: service_completed_successfully }
 
