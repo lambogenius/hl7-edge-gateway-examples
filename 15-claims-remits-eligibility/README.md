@@ -65,14 +65,14 @@ The Mermaid sources are in [diagrams/](diagrams). After editing one, re-export t
 
 ## Run it
 
-You need Docker, the gateway image **0.9.0 or later**, and a license. See
-[the prerequisites](../README.md#prerequisites). The files are test interchanges (ISA-15 = `T`), so the free
-Developer license works.
+You need Docker, the gateway image **0.9.2 or later** (0.9.0 works, but its health check reports the TLS console as
+unhealthy), and a license. See [the prerequisites](../README.md#prerequisites). The files are test interchanges
+(ISA-15 = `T`), so the free Developer license works.
 
 ```sh
 cp .env.example .env          # then put your license in LAMBOGENIUS_LICENSE
-docker run --rm lambogenius/hl7-edge-gateway:0.9.0 generate-key          # into HL7EDGE_STORE_KEY
-docker run --rm -it lambogenius/hl7-edge-gateway:0.9.0 hash-password     # into BILLING_OPS_PASSWORD_HASH, in '…'
+docker run --rm lambogenius/hl7-edge-gateway:0.9.2 generate-key          # into HL7EDGE_STORE_KEY
+docker run --rm -it lambogenius/hl7-edge-gateway:0.9.2 hash-password     # into BILLING_OPS_PASSWORD_HASH, in '…'
 docker compose up -d
 ```
 
