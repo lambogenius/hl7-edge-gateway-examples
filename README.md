@@ -64,3 +64,5 @@ The samples use the same ports (7890, 8080, 8443…), so run one at a time.
 - `docker compose run --rm send --to gateway:7890 /messages/<file>` uses the gateway's own MLLP test client.
 - Diagrams: edit `<sample>/diagrams/*.mmd`, then run `./render-diagrams.sh <sample>` (Docker) to re-export the
   PNGs. `mermaid-config.json` sets their look.
+- Console screenshots: with a sample running, `./screenshot-console.sh <file.png> [console URL]` (Docker) takes the
+  overview the docs use. It signs in with `HL7EDGE_ADMIN_TOKEN`, or with `CONSOLE_USER` and `CONSOLE_PASSWORD`.
